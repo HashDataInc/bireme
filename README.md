@@ -91,7 +91,7 @@ In the configuration file for each data source, specify the table which the data
 
 ```
 <OriginTable_1> = <MappedTable_1>
-<OriginTable_1> = <MappedTable_1>
+<OriginTable_2> = <MappedTable_2>
 ...
 ```
 

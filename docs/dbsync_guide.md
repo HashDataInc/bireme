@@ -1,13 +1,14 @@
-# 快速开始
+#Getting Started Guide
 
-在这一部分，将演示如何用 dbsync 同步 MySQL 的一张表 demo.test 到 GreenPlum 数据库 public.test。在开始之前，用户需要部署好 MySQL，Kafka 以及 GreenPlum。  
-**注：**必须保证所有表都包含主键。
+In this section, we will demonstrate how to use dbsync to synchronize MySQL with a table named *demo.test* to *public.test* in GreenPlum database. Before the start, users need to deploy MySQL, Kafka and GreenPlum.
 
-## 1. 准备工作
+**Note:** All tables must contain primary key.
 
-### 1.1 配置 MySQL
+## 1. Preparation
 
-为保证 Maxwell 读取到 binlog，需要将 Replication 设置为 row-based。
+## 1.1 MySQL configuration
+
+Maxwell can only operate if row-based replication is on.
 
 ```
 $ vi my.cnf
@@ -18,7 +19,7 @@ log-bin=master
 binlog_format=row
 ```
 
-为 Maxwell 创建用户 maxwell 并赋予权限
+Create maxwell user and grant it authority
 
 ```
 mysql> GRANT ALL on maxwell.* to 'maxwell'@'%' identified by 'XXXXXX';
@@ -26,41 +27,43 @@ mysql> GRANT SELECT, REPLICATION CLIENT, REPLICATION SLAVE on *.* to 'maxwell'@'
 
 ```
 
-创建新表 demo.test
+Create a new table *demo.test*.
 
 ```
 create database demo;
 create table demo.test (id int primary key, name varchar(10));
 ``` 
 
-### 1.2 创建 Kafka topic
+### 1.2 Create topic in Kafka
 
-为 Maxwell 创建名为 mytopic 的 topic，--zookeeper 指定 zookeeper 的服务器。
+Create a topic named *mytopic* for Maxwell producing message.
 
 ```
 bin/kafka-topics.sh --create --zookeeper zookeeperhost:2181 --replication-factor 1 --partitions 1 --topic mytopic
 ```
 
-### 1.3 在 GreenPlum 中新建表
+### 1.3 Create corresponding table in GreenPlum
 
 ```
 create table test (id int primary key, name varchar(10));
 ```
 
-### 1.4 启动 Maxwell 
+### 1.4 Start Maxwell
 
 ```
-bin/maxwell --user='maxwell' --password='XXXXXX' --host=mysqlhost \
-   --producer=kafka --kafka.bootstrap.servers=kafkahost:9092
+bin/maxwell --user='maxwell' --password='XXXXXX' \
+--host=mysqlhost --producer=kafka \
+--kafka_topic = mytopic \
+--kafka.bootstrap.servers=kafkahost:9092
 ```
 
---host 参数指定 MySQL 所在主机，--kafka.bootstrap.servers 参数指定 Kafka 所在主机
+Use `--host` option and `--kafka.bootstrap.servers` option to designate MySQL host and Kafka host.
 
-## 2 dbsync 配置及启动
+## 2 Config dbsync and start
 
-### 2.1 修改 etc/config.properties
+### 2.1 Edit etc/config.properties
 
-在 config.properties 文件中指定目标数据库的连接信息，数据源信息
+Config connection infomation to the target database, as well as data source information.
 
 ```
 target.url = jdbc:postgresql://gpdbhost:5432/XXXXXX
@@ -74,28 +77,28 @@ mysql.kafka.server = kafkahost:9092
 mysql.kafka.topic = mytopic
 ```
 
-### 2.2 修改表映射文件
+### 2.2 Edit table mapping file
 
-在 config.properties 文件中指定数据源为 mysql，因此需要新建文件 etc/mysql.properties，加入修改
+As we appoint *mysql* as data source name, we need to create a file *mysql.properties* in *etc* directory and insert the following.
 
 ```
 demo.test = public.test
 ```
 
-### 2.3 启动 dbsync
-在 dbsync 主目录下，执行
+### 2.3 Start dbsync
 
 ```
 bin/dbsync start
 ```
 
-当输出 The dbsync has started. 表明Dbsync成功启动。  
-启动后，在 MySQL 的 demo.test 表中插入数据，就会被同步到 GreenPlum 的public.test表。
+When you get the message *The dbsync has started*, dbsync has successfully started. Then you could insert data in MySQL and it will be synced to GreenPlum.
 
-需要停止时，执行
+If you need to stop
 
 ```
 bin/dbsync stop
 ```
 
-dbsync 的输出及日志位于 logs 文件夹下。
+log files are located in *logs* directory
+
+

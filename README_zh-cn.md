@@ -1,6 +1,6 @@
 # dbsync
 
-[入门指南](docs/dbsync_guide.md)
+[入门指南](docs/dbsync_guide_zh-cn.md)
 
 Dbsync 是一个 Greenplum / HashData 数据仓库的**增量**同步工具。目前支持 MySQL 数据源。  
 
@@ -56,7 +56,7 @@ Dbsync 从数据源读取数据 (Record)，将其转化为内部格式 (Row) 并
 |data.source|指定数据源，即 \<source_name\>，多个数据源用逗号分隔开，忽略空白字符|
 |\<source_name\>.type|指定数据源的类型，例如 maxwell|
 
-**注：**数据源名称只是符号，方便在Dbsync中指代，可以根据需求修改。
+**注:** 数据源名称只是符号，方便在Dbsync中指代，可以根据需求修改。
 
 **Maxwell 数据源参数**
 
