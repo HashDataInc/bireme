@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+
+NAME="dbsync"
+DESC="dbsync service"
+BINDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TOPDIR="$(cd "$(dirname "${BINDIR}")" && pwd)"
+
+EXEC="$(which jsvc)"
+
+if [ -z "${EXEC}" ]; then
+  echo 'command "jsvc" is not found.'
+  exit 1
+fi
+
+if [ -z "${JAVA_HOME}" ]; then
+  echo '"JAVA_HOME" is not set.'
+  exit 1
+fi
+
+for f in ${TOPDIR}/lib/*.jar; do
+  CLASS_PATH=$f:${CLASS_PATH}
+done
+
+CLASS="cn.hashdata.dbsync.Dbsync"
+
+CMD=$1
+
+shift
+
+ARGS="$*"
+PID="/tmp/$NAME.pid"
+
+# System.out writes to this file...
+LOG_OUT="${TOPDIR}/logs/$NAME.out"
+
+# System.err writes to this file...
+LOG_ERR="${TOPDIR}/logs/$NAME.err"
+
+HEAP_DUMP="${TOPDIR}/logs/$NAME.heapdump"
+
+LOG_GC="${TOPDIR}/logs/$NAME.gc"
+
+jsvc_exec() {
+  cd "${TOPDIR}" || exit 1
+  "${EXEC}" -cwd "${TOPDIR}" -home "${JAVA_HOME}" -cp "${CLASS_PATH}" \
+    -Dlog4j.configurationFile=${TOPDIR}/etc/log4j2.xml \
+    -XX:+UseG1GC -XX:+UseStringDeduplication \
+    -XX:-HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=${HEAP_DUMP} \
+    -XX:-PrintGCDetails -XX:-PrintGCTimeStamps -XX:-UseGCLogFileRotation \
+    -XX:NumberOfGCLogFiles=2 -XX:GCLogFileSize=1024K -Xloggc:${LOG_GC} \
+    -jvm server -wait 60 -outfile "${LOG_OUT}" -errfile "${LOG_ERR}" \
+    -pidfile "${PID}" $1 "${CLASS}" ${ARGS}
+}
+
+case "${CMD}" in
+  start)
+    echo "Starting the $DESC..."
+
+    # Start the service
+    if ! jsvc_exec; then
+      echo "Failed to start $DESC"
+      exit 1
+    fi
+
+    echo "The $DESC has started."
+  ;;
+  stop)
+    if [ -f "$PID" ]; then
+      echo "Stopping the $DESC..."
+
+      # Stop the service
+      if ! jsvc_exec "-stop"; then
+        echo "Failed to stop $DESC"
+        exit 1
+      fi
+
+      echo "The $DESC has stopped."
+    else
+      echo "Daemon not running, no action taken"
+      exit 1
+    fi
+  ;;
+  restart)
+    if [ -f "$PID" ]; then
+      echo "Restarting the $DESC..."
+
+      # Stop the service
+      jsvc_exec "-stop"
+
+      # Start the service
+      if ! jsvc_exec; then
+	    echo "Failed to start $DESC"
+	    exit 1
+	  fi
+
+	  echo "The $DESC has restarted."
+    else
+      echo "Daemon not running, no action taken"
+      exit 1
+    fi
+      ;;
+  *)
+  echo "Usage: $0 {start|stop|restart}" >&2
+  exit 1
+  ;;
+esac

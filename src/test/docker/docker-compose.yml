@@ -1,0 +1,43 @@
+version: '3'
+services:
+  db:
+    image: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+    command: docker-entrypoint.sh --server-id=1 --log-bin=master --binlog_format=row
+    ports: 
+      - "3306:3306"
+    container_name: MySQL
+
+  maxwell:
+    image: osheroff/maxwell
+    restart: always
+    depends_on:
+      - db
+      - kafka
+    command: bin/maxwell --user=root --password=123456 --host=db --producer=kafka --kafka.bootstrap.servers=kafka:9092
+
+  zookeeper:
+    image: zookeeper:latest
+    ports:
+      - "2181:2181"
+    volumes:
+      - /etc/localtime:/etc/localtime
+    container_name: Zookeeper
+
+  kafka:
+    image: wurstmeister/kafka:latest
+    restart: always
+    depends_on: 
+      - zookeeper
+    volumes:
+      - /etc/localtime:/etc/localtime
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_HOST_NAME: ${HOSTNAME}
+      KAFKA_ADVERTISED_PORT: 9092
+    links:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    container_name: Kafka
