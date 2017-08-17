@@ -4,7 +4,7 @@
 
 	<groupId>hashdata</groupId>
 	<artifactId>dbsync</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>v0.1.0</version>
 	<packaging>jar</packaging>
 	<name>dbsync</name>
 
