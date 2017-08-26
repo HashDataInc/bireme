@@ -3,6 +3,7 @@ package cn.hashdata.dbsync;
 import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Random;
 
 import org.junit.Before;
@@ -17,6 +18,18 @@ public class ContextTest {
     conf = TestUtil.generateConfig();
     TestUtil.addMaxellDataSource(conf, 2);
     cxt = new Context(conf, true);
+  }
+
+  @Test
+  public void testCapacity() {
+    assertTrue(cxt.changeSetQueue.remainingCapacity() == conf.changeset_queue_size);
+    assertTrue(cxt.tableRowCache.size() == conf.loadersCount);
+
+    Iterator<RowCache> iterator = cxt.tableRowCache.values().iterator();
+    while (iterator.hasNext()) {
+      RowCache cache = iterator.next();
+      assertTrue(cache.rows.remainingCapacity() == conf.row_cache_size);
+    }
   }
 
   @Test

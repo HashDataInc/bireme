@@ -8,9 +8,6 @@ import cn.hashdata.dbsync.Config.ConnectionConfig;
 import cn.hashdata.dbsync.Config.MaxwellConfig;
 
 public class TestUtil {
-  public static void addTableInfo(
-      Config conf, ArrayList<String> tableName, ArrayList<Table> tableInfo) {}
-
   public static void addMaxellDataSource(Config conf, int tableCount) {
     String name = "datasource_" + conf.dataSource.size();
     MaxwellConfig maxwellConfig = new MaxwellConfig();
@@ -25,6 +22,7 @@ public class TestUtil {
       conf.tableMap.put(name + "."
               + "demo.table" + count,
           "public." + name + "_table_" + count);
+      conf.loadersCount++;
     }
 
     conf.maxwellConf.add(maxwellConfig);

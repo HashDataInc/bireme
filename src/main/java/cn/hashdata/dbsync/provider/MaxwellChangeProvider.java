@@ -565,8 +565,7 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
       return record.position.lessEqual(prePosition);
     }
 
-    private Row convertRecord(Record record, RowType type)
-        throws DbsyncException, InterruptedException, Exception {
+    public Row convertRecord(Record record, RowType type) throws DbsyncException, Exception {
       Table table = cxt.tablesInfo.get(getMappedTableName(record));
       Row row = cxt.idleRows.borrowObject();
 
