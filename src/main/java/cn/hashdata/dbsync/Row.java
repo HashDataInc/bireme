@@ -23,7 +23,6 @@ public class Row {
   public String keys;
   public String oldKeys;
   public String tuple;
-  public Position position;
 
   /**
    * A implementation of {@code BasePooledObjectFactory} in order to reuse {@code Row}.
@@ -48,7 +47,6 @@ public class Row {
       row.keys = null;
       row.oldKeys = null;
       row.tuple = null;
-      row.position = null;
     }
   }
 

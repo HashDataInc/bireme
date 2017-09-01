@@ -30,8 +30,8 @@ public class BookKeeper implements Callable<Long> {
 
   Context cxt;
   String bookKeepingTable;
-  ConcurrentHashMap<String, Pair<Position, String>> bookkeeping;
-  LinkedBlockingQueue<Triple<String, Position, String>> positionUpdateQueue;
+  ConcurrentHashMap<String, Pair<CommitCallback, String>> bookkeeping;
+  LinkedBlockingQueue<Triple<String, CommitCallback, String>> positionUpdateQueue;
 
   Connection connUpdateNormal;
   Connection connUpdateError;
@@ -80,14 +80,14 @@ public class BookKeeper implements Callable<Long> {
 
     try {
       while (!cxt.stop) {
-        HashMap<String, Pair<Position, String>> buffer =
-            new HashMap<String, Pair<Position, String>>();
-        ArrayList<Triple<String, Position, String>> batch =
-            new ArrayList<Triple<String, Position, String>>();
+        HashMap<String, Pair<CommitCallback, String>> buffer =
+            new HashMap<String, Pair<CommitCallback, String>>();
+        ArrayList<Triple<String, CommitCallback, String>> batch =
+            new ArrayList<Triple<String, CommitCallback, String>>();
 
         positionUpdateQueue.drainTo(batch);
 
-        for (Triple<String, Position, String> triple : batch) {
+        for (Triple<String, CommitCallback, String> triple : batch) {
           if (triple.getRight().equals("Error")) {
             String tableName = triple.getLeft();
             triple = Triple.of(tableName, null, "Error");
@@ -130,11 +130,11 @@ public class BookKeeper implements Callable<Long> {
     int countError = 0;
 
     try {
-      for (Entry<String, Pair<Position, String>> updateItem : bookkeeping.entrySet()) {
+      for (Entry<String, Pair<CommitCallback, String>> updateItem : bookkeeping.entrySet()) {
         state = updateItem.getValue().getRight();
 
         if (state.equals("Normal")) {
-          Position position = updateItem.getValue().getLeft();
+          CommitCallback position = updateItem.getValue().getLeft();
           // POSITION, TYPE, STATE, ORIGIN_TABLE
           psNormal.setString(1, position.toStirng());
           psNormal.setString(2, position.getType());

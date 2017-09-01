@@ -8,15 +8,14 @@ import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.logging.log4j.LogManager;
@@ -28,12 +27,13 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
+import cn.hashdata.dbsync.AbstractCommitCallback;
 import cn.hashdata.dbsync.ChangeSet;
 import cn.hashdata.dbsync.Transformer;
 import cn.hashdata.dbsync.Config.MaxwellConfig;
 import cn.hashdata.dbsync.Context;
 import cn.hashdata.dbsync.DbsyncException;
-import cn.hashdata.dbsync.Position;
+import cn.hashdata.dbsync.CommitCallback;
 import cn.hashdata.dbsync.Provider;
 import cn.hashdata.dbsync.Row;
 import cn.hashdata.dbsync.Row.RowType;
@@ -56,11 +56,10 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
 
   protected Context cxt;
   protected LinkedBlockingQueue<ChangeSet> changeSetOut;
-  protected ArrayList<TopicPartition> tpArray;
-  protected Properties props;
   protected KafkaConsumer<String, String> consumer;
   protected MaxwellConfig providerConfig;
   private LinkedBlockingQueue<Transformer> idleTransformer;
+  private LinkedBlockingQueue<MaxwellCommitCallback> commitCallbacks;
 
   /**
    * Create a new {@code MaxwellChangeProvider}.
@@ -85,70 +84,65 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
       throws DbsyncException {
     this.cxt = cxt;
     this.changeSetOut = cxt.changeSetQueue;
-    this.props = new Properties();
     this.providerConfig = config;
     this.idleTransformer = new LinkedBlockingQueue<Transformer>();
-    this.tpArray = new ArrayList<TopicPartition>();
+    this.commitCallbacks = new LinkedBlockingQueue<MaxwellCommitCallback>();
 
     if (!test) {
       setupKafkaConsumer();
-
       this.providerMeter =
           cxt.metrics.meter(MetricRegistry.name(MaxwellChangeProvider.class, providerConfig.name));
-
-      for (Entry<String, String> entry : providerConfig.tableMap.entrySet()) {
-        logger.info("MaxWellChangeProvider {}: Sync {} to {}.", providerConfig.name, entry.getKey(),
-            entry.getValue());
-      }
+    }
+    for (Entry<String, String> entry : providerConfig.tableMap.entrySet()) {
+      logger.info("MaxWellChangeProvider {}: Sync {} to {}.", providerConfig.name, entry.getKey(),
+          entry.getValue());
     }
   }
 
   private void setupKafkaConsumer() throws DbsyncException {
-    SetProps(this.props, providerConfig);
-    this.consumer = new KafkaConsumer<String, String>(props);
+    Properties props = kafkaProps(providerConfig);
+    consumer = new KafkaConsumer<String, String>(props);
     Iterator<PartitionInfo> iterator = consumer.partitionsFor(providerConfig.topic).iterator();
-
+    ArrayList<TopicPartition> tpArray = new ArrayList<TopicPartition>();
     PartitionInfo partitionInfo;
     TopicPartition tp;
+
     while (iterator.hasNext()) {
       partitionInfo = iterator.next();
       tp = new TopicPartition(providerConfig.topic, partitionInfo.partition());
       tpArray.add(tp);
     }
+
     consumer.assign(tpArray);
+  }
 
-    HashMap<Integer, Long> partitionOffset = new HashMap<Integer, Long>();
-    for (TopicPartition topicPartition : tpArray) {
-      partitionOffset.put(topicPartition.partition(), Long.MAX_VALUE);
-    }
+  private void checkAndCommit() throws DbsyncException {
+    CommitCallback callback = null;
 
-    for (String table : providerConfig.tableMap.keySet()) {
-      if (cxt.bookkeeping.containsKey(table)) {
-        Position p = cxt.bookkeeping.get(table).getLeft();
-
-        if (p.getType() != PROVIDER_TYPE) {
-          String message = "Provider type for table " + table + " does not match privious!";
-          logger.fatal(message);
-          throw new DbsyncException(message);
-        }
-
-        Integer partition = ((MaxwellChangePosition) p).partition;
-        Long offset = ((MaxwellChangePosition) p).offset;
-        if (offset < partitionOffset.get(partition)) {
-          partitionOffset.put(partition, offset);
-        }
+    while (!commitCallbacks.isEmpty()) {
+      if (commitCallbacks.peek().ready()) {
+        callback = commitCallbacks.remove();
+      } else {
+        break;
       }
     }
 
-    for (TopicPartition topicPartition : tpArray) {
-      Integer partition = topicPartition.partition();
-      Long offset = partitionOffset.get(partition);
-      offset = offset == Long.MAX_VALUE ? 0 : offset;
-
-      consumer.seek(topicPartition, offset);
-      logger.info("MaxwellChangeProvider {}: partition {}, offset {}.", providerConfig.name,
-          partition, offset);
+    if (callback != null) {
+      callback.commit();
     }
+  }
+
+  private Properties kafkaProps(MaxwellConfig conf) {
+    Properties props = new Properties();
+    props.put("bootstrap.servers", conf.server);
+    props.put("group.id", "dbsync");
+    props.put("enable.auto.commit", false);
+    props.put("auto.commit.interval.ms", 1000);
+    props.put("session.timeout.ms", 30000);
+    props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+    props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+    props.put("auto.offset.reset", "earliest");
+    return props;
   }
 
   /**
@@ -169,6 +163,7 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
       while (!cxt.stop) {
         do {
           records = consumer.poll(TIMEOUT_MS);
+          checkAndCommit();
         } while (records.isEmpty() && !cxt.stop);
 
         if (cxt.stop) {
@@ -181,10 +176,13 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
         changeSet.provider = this;
         changeSet.createdAt = new Date();
         changeSet.changes = records;
+        changeSet.callback = new MaxwellCommitCallback(this);
+        commitCallbacks.offer((MaxwellCommitCallback) changeSet.callback);
 
         boolean success;
         do {
           success = changeSetOut.offer(changeSet, TIMEOUT_MS, TimeUnit.MILLISECONDS);
+          checkAndCommit();
         } while (!success && !cxt.stop);
 
         if (success) {
@@ -203,17 +201,6 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
         providerConfig.server, providerConfig.topic);
 
     return 0L;
-  }
-
-  private void SetProps(Properties props, MaxwellConfig conf) {
-    props.put("bootstrap.servers", conf.server);
-    props.put("group.id", "dbsync");
-    props.put("enable.auto.commit", true);
-    props.put("auto.commit.interval.ms", 1000);
-    props.put("session.timeout.ms", 30000);
-    props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-    props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-    props.put("auto.offset.reset", "earliest");
   }
 
   @Override
@@ -240,54 +227,52 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
   }
 
   /**
-   * {@code MaxwellChangePosition} is a type of {@code Position}. It is used to mark the offset of
+   * {@code MaxwellCommitCallback} is a type of {@code Position}. It is used to mark the offset of
    * data in <B>Maxwell</B> data source.
    *
    * @author yuze
    *
    */
-  public static class MaxwellChangePosition implements Position {
-    public Integer partition;
-    public Long offset;
+  public class MaxwellCommitCallback extends AbstractCommitCallback {
     public String type;
+    public MaxwellChangeProvider provider;
+    public HashMap<Integer, Long> partitionOffset;
 
-    public MaxwellChangePosition(Integer partition, Long offset) {
-      this.partition = partition;
-      this.offset = offset;
+    public MaxwellCommitCallback(Provider provider) {
+      super();
       this.type = PROVIDER_TYPE;
-    }
-
-    public MaxwellChangePosition(String partitionOffset) {
-      fromString(partitionOffset);
-      this.type = PROVIDER_TYPE;
+      this.provider = (MaxwellChangeProvider) provider;
+      this.partitionOffset = new HashMap<Integer, Long>();
     }
 
     @Override
     public String toStirng() {
-      return Integer.toString(partition) + ":" + Long.toString(offset);
+      return null;
     }
 
     @Override
-    public void fromString(String str) {
-      String[] arg = str.split(":");
-      partition = Integer.valueOf(arg[0]);
-      offset = Long.valueOf(arg[1]);
-    }
-
-    @Override
-    public boolean lessEqual(Position other) throws DbsyncException {
-      if (!this.type.equals(other.getType())) {
-        String message = "Position type does not match the previous";
-        throw new DbsyncException(message);
-      }
-
-      MaxwellChangePosition o = (MaxwellChangePosition) other;
-      return offset <= o.offset;
-    }
+    public void fromString(String str) {}
 
     @Override
     public String getType() {
       return type;
+    }
+
+    @Override
+    public void commit() {
+      KafkaConsumer<String, String> consumer = provider.consumer;
+      HashMap<TopicPartition, OffsetAndMetadata> offsets =
+          new HashMap<TopicPartition, OffsetAndMetadata>();
+      String topic = provider.providerConfig.topic;
+
+      for (Entry<Integer, Long> offset : partitionOffset.entrySet()) {
+        offsets.put(new TopicPartition(topic, offset.getKey()),
+            new OffsetAndMetadata(offset.getValue() + 1));
+      }
+
+      consumer.commitSync(offsets);
+      committed.set(true);
+      partitionOffset.clear();
     }
   }
 
@@ -298,7 +283,7 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
    * @author yuze
    *
    */
-  public static class MaxwellChangeTransformer extends Transformer {
+  public class MaxwellChangeTransformer extends Transformer {
     private static final char FIELD_DELIMITER = '|';
     private static final char NEWLINE = '\n';
     private static final char QUOTE = '"';
@@ -312,7 +297,7 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
     protected StringBuilder fieldStringBuilder;
     protected Gson gson;
 
-    public static class Record {
+    public class Record {
       public String dataSource;
       public String database;
       public String table;
@@ -322,7 +307,6 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
       public boolean commit;
       public JsonObject data;
       public JsonObject old;
-      public Position position;
     }
 
     public MaxwellChangeTransformer(Context cxt) {
@@ -340,22 +324,20 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
 
       RowSet set = cxt.idleRowSets.borrowObject();
       set.createdAt = changeSet.createdAt;
-      set.rowBucket.clear();
 
-      int count = 0;
+      CommitCallback callback = changeSet.callback;
+      HashMap<Integer, Long> offsets = ((MaxwellCommitCallback) callback).partitionOffset;
       Record record;
-
       for (ConsumerRecord<String, String> change :
           (ConsumerRecords<String, String>) changeSet.changes) {
         record = gson.fromJson(change.value(), Record.class);
         record.dataSource = provider.getProviderName();
-        record.position = new MaxwellChangePosition(change.partition(), change.offset());
         // filter
         if (filter(record)) {
           continue;
         }
+
         // transform
-        count++;
         switch (record.type) {
           case "insert":
             addToRowSet(set, convertRecord(record, RowType.INSERT));
@@ -367,10 +349,11 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
             addToRowSet(set, convertRecord(record, RowType.UPDATE));
             break;
         }
+        offsets.put(change.partition(), change.offset());
       }
 
-      logger.trace("Transform ChangeSet {} to RowSet {}, #rows: {}.", changeSet.hashCode(),
-          set.hashCode(), count);
+      callback.setNumOfTables(set.rowBucket.size());
+      set.callback = callback;
 
       cxt.idleChangeSets.returnObject(changeSet);
       return set;
@@ -542,8 +525,7 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
 
     private Boolean filter(Record record) throws DbsyncException {
       String fullTableName = record.dataSource + "." + record.database + "." + record.table;
-      ConcurrentHashMap<String, Pair<Position, String>> bookKeeping = cxt.bookkeeping;
-      MaxwellChangePosition prePosition;
+      // ConcurrentHashMap<String, Pair<Position, String>> bookKeeping = cxt.bookkeeping;
 
       MaxwellChangeProvider p = (MaxwellChangeProvider) changeSet.provider;
       if (!p.providerConfig.tableMap.containsKey(fullTableName)) {
@@ -551,18 +533,19 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
         return true;
       }
 
-      if (bookKeeping.get(fullTableName) == null) {
-        // sync this table but haven't bookKeeped
-        return false;
-      }
+      // if (bookKeeping.get(fullTableName) == null) {
+      // // sync this table but haven't bookKeeped
+      // return false;
+      // }
+      //
+      // if (bookKeeping.get(fullTableName).getRight().equals("Error")) {
+      // // the loader for this table is stop
+      // return true;
+      // }
 
-      if (bookKeeping.get(fullTableName).getRight().equals("Error")) {
-        // the loader for this table is stop
-        return true;
-      }
-
-      prePosition = (MaxwellChangePosition) bookKeeping.get(fullTableName).getLeft();
-      return record.position.lessEqual(prePosition);
+      // prePosition = (MaxwellCommitCallback) bookKeeping.get(fullTableName).getLeft();
+      // return record.position.lessEqual(prePosition);
+      return false;
     }
 
     public Row convertRecord(Record record, RowType type) throws DbsyncException, Exception {
@@ -572,8 +555,6 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
       row.type = type;
       row.originTable = getOriginTableName(record);
       row.mappedTable = getMappedTableName(record);
-      row.position = record.position;
-      record.position = null;
       row.keys = formatKeys(record, table, false);
 
       if (type == RowType.INSERT) {

@@ -1,6 +1,5 @@
 package cn.hashdata.dbsync;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
@@ -89,7 +88,7 @@ public class TaskGenerator implements Callable<Long> {
         continue;
       }
 
-      ArrayList<Row> batch = cache.createBatch(conf.merge_interval, conf.batch_size);
+      RowBatchMerger batch = cache.fetchBatch();
 
       if (cxt.stop) {
         break;
@@ -98,7 +97,7 @@ public class TaskGenerator implements Callable<Long> {
       if (batch != null) {
         logger.trace("Create batch {}.", batch.hashCode());
 
-        task = cs.submit(new RowBatchMerger(entry.getKey(), batch, cxt));
+        task = cs.submit(batch);
         boolean success;
 
         do {

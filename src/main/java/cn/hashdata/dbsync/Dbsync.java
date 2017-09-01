@@ -38,7 +38,6 @@ import com.codahale.metrics.JmxReporter;
 
 import cn.hashdata.dbsync.Config.ConnectionConfig;
 import cn.hashdata.dbsync.provider.MaxwellChangeProvider;
-import cn.hashdata.dbsync.provider.MaxwellChangeProvider.MaxwellChangePosition;
 
 /**
  * {@code Dbsync} is an incremental synchronization tool. It could sync update in MySQL to GreenPlum
@@ -216,9 +215,9 @@ public class Dbsync implements Daemon {
       PreparedStatement ps = conn.prepareStatement(sql);
       ResultSet rs = ps.executeQuery();
 
-      ConcurrentHashMap<String, Pair<Position, String>> bookKeep = cxt.bookkeeping;
+      ConcurrentHashMap<String, Pair<CommitCallback, String>> bookKeep = cxt.bookkeeping;
       String type;
-      Position position;
+      CommitCallback position;
 
       while (rs.next()) {
         type = rs.getString(3);
@@ -230,7 +229,7 @@ public class Dbsync implements Daemon {
 
           switch (type) {
             case "Maxwell":
-              position = new MaxwellChangePosition(rs.getString(2));
+              position = null; // new MaxwellChangePosition(rs.getString(2));
               bookKeep.put(rs.getString(1), Pair.of(position, "Normal"));
               break;
           }
@@ -250,7 +249,7 @@ public class Dbsync implements Daemon {
         ps.setString(4, "Normal");
 
         if (cxt.bookkeeping.containsKey(table)) {
-          Position p = cxt.bookkeeping.get(table).getLeft();
+          CommitCallback p = cxt.bookkeeping.get(table).getLeft();
           ps.setString(2, p.toStirng());
           ps.setString(3, p.getType());
         } else {
@@ -372,7 +371,7 @@ public class Dbsync implements Daemon {
       initBookkeepPosition();
     }
 
-    createBookKeeper();
+    // createBookKeeper();
     createChangeLoaders();
     createTaskGenerator();
     createChangeDispatcher();

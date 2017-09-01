@@ -16,6 +16,7 @@ public class ChangeSet {
   public Provider provider;
   public Date createdAt;
   public Object changes;
+  public CommitCallback callback;
 
   /**
    * A implementation of {@code BasePooledObjectFactory} in order to reuse {@code ChangeSet}.
@@ -38,6 +39,7 @@ public class ChangeSet {
       changeSet.provider = null;
       changeSet.createdAt = null;
       changeSet.changes = null;
+      changeSet.callback = null;
     }
   }
 }

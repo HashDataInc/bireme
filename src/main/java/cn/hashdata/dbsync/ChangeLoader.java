@@ -53,7 +53,7 @@ public class ChangeLoader implements Callable<Long> {
   protected LoadTask currentTask;
   ExecutorService threadPool;
   private String mappedTable;
-  protected LinkedBlockingQueue<Triple<String, Position, String>> positionUpdateQueue;
+  protected LinkedBlockingQueue<Triple<String, CommitCallback, String>> positionUpdateQueue;
 
   private Timer copyBeforeDeleteTimer;
   private Timer deleteTimer;
@@ -126,7 +126,6 @@ public class ChangeLoader implements Callable<Long> {
           throw e;
         } finally {
           releaseConnection();
-          conn = null;
           currentTask.reset();
           currentTask = null;
         }
@@ -212,6 +211,8 @@ public class ChangeLoader implements Callable<Long> {
     do {
       success = cxt.loaderConnections.offer(conn, TIMEOUT_MS, TimeUnit.MILLISECONDS);
     } while (!success && !cxt.stop);
+
+    conn = null;
   }
 
   /**
@@ -264,18 +265,8 @@ public class ChangeLoader implements Callable<Long> {
       }
     }
 
-    for (Entry<String, Position> newPosition : currentTask.positions.entrySet()) {
-      Triple<String, Position, String> record =
-          Triple.of(newPosition.getKey(), newPosition.getValue(), "Normal");
-      boolean success;
-
-      do {
-        success = positionUpdateQueue.offer(record, TIMEOUT_MS, TimeUnit.MILLISECONDS);
-      } while (!success && !cxt.stop);
-
-      if (cxt.stop) {
-        break;
-      }
+    for (CommitCallback callback : currentTask.callbacks) {
+      callback.done();
     }
   }
 

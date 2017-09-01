@@ -1,5 +1,6 @@
 package cn.hashdata.dbsync;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -12,7 +13,7 @@ import java.util.HashSet;
  */
 public class LoadTask {
   public String tableName;
-  public HashMap<String, Position> positions;
+  public ArrayList<CommitCallback> callbacks;
   public HashSet<String> delete;
   public HashMap<String, String> insert;
 
@@ -23,14 +24,14 @@ public class LoadTask {
    */
   public LoadTask(String tableName) {
     this.tableName = tableName;
-    this.positions = new HashMap<String, Position>();
+    this.callbacks = new ArrayList<CommitCallback>();
     this.delete = new HashSet<String>();
     this.insert = new HashMap<String, String>();
   }
 
   public void reset() {
     tableName = null;
-    positions.clear();
+    callbacks.clear();
     delete.clear();
     insert.clear();
   }

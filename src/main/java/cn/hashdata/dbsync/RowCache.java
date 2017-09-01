@@ -2,7 +2,6 @@ package cn.hashdata.dbsync;
 
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -20,40 +19,61 @@ import org.apache.logging.log4j.Logger;
 public class RowCache {
   static final protected Long TIMEOUT_MS = 1000L;
 
-  public Long lastTaskTime;
-  public LinkedBlockingQueue<Row> rows;
   public Context cxt;
+  public Long lastTaskTime;
+  public String tableName;
+  public LinkedBlockingQueue<Row> rows;
+  public LinkedBlockingQueue<CommitCallback> commitCallback;
+  public LinkedBlockingQueue<RowBatchMerger> rowBatchMergers;
+  public int mergeInterval;
+  public int batchSize;
 
   /**
    * Create cache for a destination table.
    *
-   * @param rowSize The maximum can be cached.
    * @param cxt The dbsync context.
+   * @param tableName The table name to cached.
    */
-  public RowCache(int rowSize, Context cxt) {
+  public RowCache(Context cxt, String tableName) {
     this.cxt = cxt;
-    rows = new LinkedBlockingQueue<Row>(rowSize);
+    this.tableName = tableName;
+    this.mergeInterval = cxt.conf.merge_interval;
+    this.batchSize = cxt.conf.batch_size;
     lastTaskTime = new Date().getTime();
+
+    this.rows = new LinkedBlockingQueue<Row>(cxt.conf.batch_size);
+    this.commitCallback = new LinkedBlockingQueue<CommitCallback>();
+    this.rowBatchMergers =
+        new LinkedBlockingQueue<RowBatchMerger>(cxt.conf.row_cache_size / cxt.conf.batch_size);
   }
 
   /**
    * Add an Array of {@code Rows} to cache one by one. This method is continuously blocking for a
    * while when there is no available space in the cache.
    *
-   * @param rows the Array of {@code Rows}
-   * @throws InterruptedException - if interrupted while waiting
+   * @param newRows the Array of {@code Rows}
+   * @param callback
+   * @throws InterruptedException if interrupted while waiting
+   * @throws DbsyncException Exception while borrow from pool
    */
-  public void addRows(ArrayList<Row> rows) throws InterruptedException {
-    boolean success;
-    for (Row row : rows) {
+  public void addRows(ArrayList<Row> newRows, CommitCallback callback)
+      throws InterruptedException, DbsyncException {
+    createBatch();
+
+    for (Row row : newRows) {
+      boolean success;
+
       do {
-        success = this.rows.offer(row, TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        success = rows.offer(row, TIMEOUT_MS, TimeUnit.MILLISECONDS);
       } while (!success && !cxt.stop);
 
       if (cxt.stop) {
         break;
       }
     }
+    commitCallback.offer(callback);
+
+    createBatch();
   }
 
   /**
@@ -63,22 +83,56 @@ public class RowCache {
    * @param interval The minimum time between two operations
    * @param maxSize The amount condition to trigger the operation
    * @return the drained array of {@code Rows}
-   * @throws InterruptedException - if interrupted while waiting
-   * @throws Exception Exception while borrow from pool
+   * @throws InterruptedException if interrupted while waiting
+   * @throws DbsyncException Exception while borrow from pool
    */
-  public ArrayList<Row> createBatch(long interval, long maxSize)
-      throws InterruptedException, Exception {
-    if (new Date().getTime() - lastTaskTime < interval && rows.size() < maxSize) {
-      return null;
+  private synchronized void createBatch() throws InterruptedException, DbsyncException {
+    if (new Date().getTime() - lastTaskTime < mergeInterval && rows.size() < batchSize) {
+      return;
     }
 
     if (rows.isEmpty()) {
-      return null;
+      return;
     }
 
-    ArrayList<Row> batch = cxt.idleRowArrays.borrowObject();
-    rows.drainTo(batch, (int) maxSize);
+    ArrayList<Row> rows = null;
+
+    try {
+      rows = cxt.idleRowArrays.borrowObject();
+    } catch (Exception e) {
+      throw new DbsyncException(e);
+    }
+
+    this.rows.drainTo(rows);
+    ArrayList<CommitCallback> callbacks = new ArrayList<CommitCallback>();
+    this.commitCallback.drainTo(callbacks);
+    RowBatchMerger batch = new RowBatchMerger(cxt, tableName, rows, callbacks);
+
+    boolean success;
+
+    do {
+      success = rowBatchMergers.offer(batch, TIMEOUT_MS, TimeUnit.MILLISECONDS);
+    } while (!success && !cxt.stop);
+
     lastTaskTime = new Date().getTime();
+  }
+
+  /**
+   * Fetch a batch of rows from cache
+   * 
+   * @return the batch
+   * @throws InterruptedException if interrupted while waiting
+   * @throws DbsyncException Exception while borrow from pool
+   */
+  public RowBatchMerger fetchBatch() throws InterruptedException, DbsyncException {
+    createBatch();
+
+    RowBatchMerger batch = null;
+
+    do {
+      batch = rowBatchMergers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+    } while (batch == null && !cxt.stop);
+
     return batch;
   }
 
@@ -89,9 +143,10 @@ public class RowCache {
    * @author yuze
    *
    */
-  public static class RowBatchMerger implements Callable<LoadTask> {
+  public class RowBatchMerger implements Callable<LoadTask> {
     protected String mappedTableName;
     protected ArrayList<Row> rows;
+    protected ArrayList<CommitCallback> callbacks;
     protected Context cxt;
 
     private Logger logger = LogManager.getLogger("Dbsync." + RowBatchMerger.class);
@@ -103,10 +158,12 @@ public class RowCache {
      * @param rows The batch of {@code Rows} to be merged
      * @param cxt The dbsync context
      */
-    public RowBatchMerger(String mappedTableName, ArrayList<Row> rows, Context cxt) {
+    public RowBatchMerger(Context cxt, String mappedTableName, ArrayList<Row> rows,
+        ArrayList<CommitCallback> callbacks) {
+      this.cxt = cxt;
       this.mappedTableName = mappedTableName;
       this.rows = rows;
-      this.cxt = cxt;
+      this.callbacks = callbacks;
     }
 
     /**
@@ -116,12 +173,8 @@ public class RowCache {
       Thread.currentThread().setName("RowBatchMerger");
 
       LoadTask task = new LoadTask(mappedTableName);
-      HashMap<String, Position> position = task.positions;
 
       for (Row row : rows) {
-        // update position
-        position.put(row.originTable, row.position);
-
         switch (row.type) {
           case INSERT:
             task.insert.put(row.keys, row.tuple);
@@ -155,10 +208,7 @@ public class RowCache {
 
       cxt.idleRowArrays.returnObject(rows);
 
-      if (task.insert.isEmpty() && task.delete.isEmpty()) {
-        return null;
-      }
-
+      task.callbacks = callbacks;
       return task;
     }
   }

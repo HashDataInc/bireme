@@ -119,7 +119,7 @@ public class Dispatcher implements Callable<Long> {
     }
   }
 
-  private void insertRowSet(RowSet rowSet) throws InterruptedException {
+  private void insertRowSet(RowSet rowSet) throws InterruptedException, DbsyncException {
     HashMap<String, ArrayList<Row>> bucket = rowSet.rowBucket;
     ConcurrentHashMap<String, RowCache> tableCache = cxt.tableRowCache;
 
@@ -127,12 +127,18 @@ public class Dispatcher implements Callable<Long> {
       logger.trace("Insert RowSet {} to cache.", rowSet.hashCode());
     }
 
-    for (Entry<String, ArrayList<Row>> entry : bucket.entrySet()) {
-      String fullTableName = entry.getKey();
-      ArrayList<Row> rows = entry.getValue();
-      RowCache cache = tableCache.get(fullTableName);
-      cache.addRows(rows);
-      cxt.idleRowArrays.returnObject(rows);
+    try {
+      for (Entry<String, ArrayList<Row>> entry : bucket.entrySet()) {
+        String fullTableName = entry.getKey();
+        ArrayList<Row> rows = entry.getValue();
+        RowCache cache = tableCache.get(fullTableName);
+        cache.addRows(rows, rowSet.callback);
+        cxt.idleRowArrays.returnObject(rows);
+      }
+    } catch (InterruptedException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new DbsyncException(e);
     }
 
     cxt.idleRowSets.returnObject(rowSet);

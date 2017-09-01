@@ -1,12 +1,12 @@
 package cn.hashdata.dbsync;
 
 /**
- * {@code Position} is used to mark the position of one message in its data source.
+ * {@code CommitCallback} is called after a loadtask successfully completed.
  *
  * @author yuze
  *
  */
-public interface Position {
+public interface CommitCallback {
   /**
    * Get the type of this {@code Position}. Usually, each type of data source has a specific method
    * to represent the position.
@@ -30,12 +30,27 @@ public interface Position {
   public void fromString(String str);
 
   /**
-   * Compare two {@code Position}.
+   * Set the number of corresponding tables
    *
-   * @param other another {@code Position} to compare with
-   * @return {@code true} if this {@code Position} is less or equal than the other, else
-   *         {@code false}
-   * @throws DbsyncException - Wrap and throw Exception which cannot be handled
+   * @param tables
    */
-  public boolean lessEqual(Position other) throws DbsyncException;
+  public void setNumOfTables(int tables);
+
+  /**
+   * Commit a successful load task for a table.
+   */
+  public void done();
+
+  /**
+   * Whether this callback is ready to commit
+   *
+   * @return ready or not
+   * @throws DbsyncException
+   */
+  public boolean ready() throws DbsyncException;
+
+  /**
+   * Commit this callback.
+   */
+  public void commit();
 }

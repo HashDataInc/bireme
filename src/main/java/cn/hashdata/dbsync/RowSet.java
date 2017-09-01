@@ -16,6 +16,7 @@ import org.apache.commons.pool2.impl.DefaultPooledObject;
 public class RowSet {
   public Date createdAt;
   public HashMap<String, ArrayList<Row>> rowBucket;
+  public CommitCallback callback;
 
   public RowSet() {
     rowBucket = new HashMap<String, ArrayList<Row>>();
