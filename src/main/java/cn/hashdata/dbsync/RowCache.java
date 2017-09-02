@@ -41,7 +41,7 @@ public class RowCache {
     this.batchSize = cxt.conf.batch_size;
     lastTaskTime = new Date().getTime();
 
-    this.rows = new LinkedBlockingQueue<Row>(cxt.conf.batch_size);
+    this.rows = new LinkedBlockingQueue<Row>(cxt.conf.batch_size * 2);
     this.commitCallback = new LinkedBlockingQueue<CommitCallback>();
     this.rowBatchMergers =
         new LinkedBlockingQueue<RowBatchMerger>(cxt.conf.row_cache_size / cxt.conf.batch_size);
@@ -51,8 +51,8 @@ public class RowCache {
    * Add an Array of {@code Rows} to cache one by one. This method is continuously blocking for a
    * while when there is no available space in the cache.
    *
-   * @param newRows the Array of {@code Rows}
-   * @param callback
+   * @param newRows the array of {@code Rows}
+   * @param callback the corresponding {@code CommitCallback}
    * @throws InterruptedException if interrupted while waiting
    * @throws DbsyncException Exception while borrow from pool
    */
@@ -119,7 +119,7 @@ public class RowCache {
 
   /**
    * Fetch a batch of rows from cache
-   * 
+   *
    * @return the batch
    * @throws InterruptedException if interrupted while waiting
    * @throws DbsyncException Exception while borrow from pool
@@ -154,9 +154,10 @@ public class RowCache {
     /**
      * Create a RowBatchMerger.
      *
-     * @param mappedTableName The destination table
-     * @param rows The batch of {@code Rows} to be merged
      * @param cxt The dbsync context
+     * @param mappedTableName the destination table
+     * @param rows  batch of {@code Rows} to be merged
+     * @param callbacks the {@code CommitCallbacks} in this batch.
      */
     public RowBatchMerger(Context cxt, String mappedTableName, ArrayList<Row> rows,
         ArrayList<CommitCallback> callbacks) {

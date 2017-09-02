@@ -28,7 +28,9 @@ public class ContextTest {
     Iterator<RowCache> iterator = cxt.tableRowCache.values().iterator();
     while (iterator.hasNext()) {
       RowCache cache = iterator.next();
-      assertTrue(cache.rows.remainingCapacity() == conf.row_cache_size);
+      assertTrue(cache.rows.remainingCapacity() == conf.batch_size * 2);
+      assertTrue(
+          cache.rowBatchMergers.remainingCapacity() == conf.row_cache_size / conf.batch_size);
     }
   }
 

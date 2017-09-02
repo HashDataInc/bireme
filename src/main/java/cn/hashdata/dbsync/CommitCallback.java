@@ -32,7 +32,7 @@ public interface CommitCallback {
   /**
    * Set the number of corresponding tables
    *
-   * @param tables
+   * @param tables number of tables
    */
   public void setNumOfTables(int tables);
 
@@ -45,7 +45,7 @@ public interface CommitCallback {
    * Whether this callback is ready to commit
    *
    * @return ready or not
-   * @throws DbsyncException
+   * @throws DbsyncException if this callback has committed
    */
   public boolean ready() throws DbsyncException;
 
