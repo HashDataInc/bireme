@@ -37,6 +37,7 @@ import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.JmxReporter;
 
 import cn.hashdata.dbsync.Config.ConnectionConfig;
+import cn.hashdata.dbsync.provider.DebeziumProvider;
 import cn.hashdata.dbsync.provider.MaxwellChangeProvider;
 
 /**
@@ -283,9 +284,15 @@ public class Dbsync implements Daemon {
   }
 
   protected void createMaxwellChangeProvider() throws DbsyncException {
-    for (int i = 0, len = cxt.conf.dataSource.size(); i < len; i++) {
+    for (int i = 0, len = cxt.conf.maxwellConf.size(); i < len; i++) {
       Callable<Long> maxwellProvider = new MaxwellChangeProvider(cxt, cxt.conf.maxwellConf.get(i));
       cxt.cs.submit(maxwellProvider);
+    }
+  }
+  protected void createDebeziumProvider() throws DbsyncException {
+    for (int i = 0, len = cxt.conf.debeziumConf.size(); i < len; i++) {
+      Callable<Long> debeziumProvider = new DebeziumProvider(cxt, cxt.conf.debeziumConf.get(i));
+      cxt.cs.submit(debeziumProvider);
     }
   }
 
@@ -376,6 +383,7 @@ public class Dbsync implements Daemon {
     createTaskGenerator();
     createChangeDispatcher();
     createMaxwellChangeProvider();
+    createDebeziumProvider();
     startReporter();
 
     if (context != null) {

@@ -26,11 +26,12 @@ import com.codahale.metrics.MetricRegistry;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import cn.hashdata.dbsync.AbstractCommitCallback;
 import cn.hashdata.dbsync.ChangeSet;
 import cn.hashdata.dbsync.Transformer;
-import cn.hashdata.dbsync.Config.MaxwellConfig;
+import cn.hashdata.dbsync.Config.DebeziumConfig;
 import cn.hashdata.dbsync.Context;
 import cn.hashdata.dbsync.DbsyncException;
 import cn.hashdata.dbsync.CommitCallback;
@@ -41,58 +42,58 @@ import cn.hashdata.dbsync.RowSet;
 import cn.hashdata.dbsync.Table;
 
 /**
- * {@code MaxwellChangeProvider} is a type of {@code Provider} to process data from <B>Maxwell +
+ * {@code DebeziumProvider} is a type of {@code Provider} to process data from <B>Debezium +
  * Kafka</B> data source.
  *
  * @author yuze
  *
  */
-public class MaxwellChangeProvider implements Callable<Long>, Provider {
+public class DebeziumProvider implements Callable<Long>, Provider {
   static final protected Long TIMEOUT_MS = 1000L;
-  static final public String PROVIDER_TYPE = "Maxwell";
+  static final public String PROVIDER_TYPE = "Debezium";
 
-  private Logger logger = LogManager.getLogger("Dbsync." + MaxwellChangeProvider.class);
+  private Logger logger = LogManager.getLogger("Dbsync." + DebeziumProvider.class);
   private Meter providerMeter;
 
   protected Context cxt;
   protected LinkedBlockingQueue<ChangeSet> changeSetOut;
   protected KafkaConsumer<String, String> consumer;
-  protected MaxwellConfig providerConfig;
+  protected DebeziumConfig providerConfig;
   private LinkedBlockingQueue<Transformer> idleTransformer;
-  private LinkedBlockingQueue<MaxwellCommitCallback> commitCallbacks;
+  private LinkedBlockingQueue<DebeziumCommitCallback> commitCallbacks;
 
   /**
-   * Create a new {@code MaxwellChangeProvider}.
+   * Create a new {@code DebeziumProvider}.
    *
    * @param cxt dbsync context
-   * @param config {@code MaxwellConfig}.
+   * @param config {@code DebeziumConfig}.
    * @throws DbsyncException - wrap and throw Exception which cannot be handled
    */
-  public MaxwellChangeProvider(Context cxt, MaxwellConfig config) throws DbsyncException {
+  public DebeziumProvider(Context cxt, DebeziumConfig config) throws DbsyncException {
     this(cxt, config, false);
   }
 
   /**
-   * Create a new {@code MaxwellChangeProvider}.
+   * Create a new {@code DebeziumProvider}.
    *
    * @param cxt dbsync context
-   * @param config {@code MaxwellConfig}.
+   * @param config {@code DebeziumProvider}.
    * @param test unitest or not
    * @throws DbsyncException - wrap and throw Exception which cannot be handled
    */
-  public MaxwellChangeProvider(Context cxt, MaxwellConfig config, Boolean test)
-      throws DbsyncException {
+  public DebeziumProvider(Context cxt, DebeziumConfig config, Boolean test) throws DbsyncException {
     this.cxt = cxt;
     this.changeSetOut = cxt.changeSetQueue;
     this.providerConfig = config;
     this.idleTransformer = new LinkedBlockingQueue<Transformer>();
-    this.commitCallbacks = new LinkedBlockingQueue<MaxwellCommitCallback>();
+    this.commitCallbacks = new LinkedBlockingQueue<DebeziumCommitCallback>();
 
     if (!test) {
       setupKafkaConsumer();
       this.providerMeter =
-          cxt.metrics.meter(MetricRegistry.name(MaxwellChangeProvider.class, providerConfig.name));
+          cxt.metrics.meter(MetricRegistry.name(DebeziumProvider.class, providerConfig.name));
     }
+
     for (Entry<String, String> entry : providerConfig.tableMap.entrySet()) {
       logger.info("MaxWellChangeProvider {}: Sync {} to {}.", providerConfig.name, entry.getKey(),
           entry.getValue());
@@ -102,15 +103,19 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
   private void setupKafkaConsumer() throws DbsyncException {
     Properties props = kafkaProps(providerConfig);
     consumer = new KafkaConsumer<String, String>(props);
-    Iterator<PartitionInfo> iterator = consumer.partitionsFor(providerConfig.topic).iterator();
+    Iterator<PartitionInfo> iterator;
     ArrayList<TopicPartition> tpArray = new ArrayList<TopicPartition>();
     PartitionInfo partitionInfo;
     TopicPartition tp;
 
-    while (iterator.hasNext()) {
-      partitionInfo = iterator.next();
-      tp = new TopicPartition(providerConfig.topic, partitionInfo.partition());
-      tpArray.add(tp);
+    for (String topic : providerConfig.tableMap.keySet()) {
+      iterator = consumer.partitionsFor(topic).iterator();
+
+      while (iterator.hasNext()) {
+        partitionInfo = iterator.next();
+        tp = new TopicPartition(topic, partitionInfo.partition());
+        tpArray.add(tp);
+      }
     }
 
     consumer.assign(tpArray);
@@ -132,10 +137,10 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
     }
   }
 
-  private Properties kafkaProps(MaxwellConfig conf) {
+  private Properties kafkaProps(DebeziumConfig providerConfig) {
     Properties props = new Properties();
-    props.put("bootstrap.servers", conf.server);
-    props.put("group.id", "dbsync");
+    props.put("bootstrap.servers", providerConfig.server);
+    props.put("group.id", "dbsync2");
     props.put("enable.auto.commit", false);
     props.put("auto.commit.interval.ms", 1000);
     props.put("session.timeout.ms", 30000);
@@ -146,15 +151,15 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
   }
 
   /**
-   * Call the {@code MaxwellChangeProvider} to work.
+   * Call the {@code DebeziumProvider} to work.
    */
   @Override
   public Long call() throws InterruptedException, Exception {
     System.out.println(Thread.currentThread());
-    Thread.currentThread().setName("MaxWellChangeProvider: " + providerConfig.name);
+    Thread.currentThread().setName("DebeziumProvider: " + providerConfig.name);
 
-    logger.info("MaxwellChangeProvider {} start. Server: {}, Topic: {}.", providerConfig.name,
-        providerConfig.server, providerConfig.topic);
+    logger.info(
+        "DebeziumProvider {} start. Server: {}.", providerConfig.name, providerConfig.server);
 
     ConsumerRecords<String, String> records;
     ChangeSet changeSet;
@@ -176,8 +181,8 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
         changeSet.provider = this;
         changeSet.createdAt = new Date();
         changeSet.changes = records;
-        changeSet.callback = new MaxwellCommitCallback(this);
-        commitCallbacks.offer((MaxwellCommitCallback) changeSet.callback);
+        changeSet.callback = new DebeziumCommitCallback(this);
+        commitCallbacks.offer((DebeziumCommitCallback) changeSet.callback);
 
         boolean success;
         do {
@@ -197,8 +202,8 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
       }
     }
 
-    logger.info("MaxwellChangeProvider {} exit. Server: {}, Topic: {}.", providerConfig.name,
-        providerConfig.server, providerConfig.topic);
+    logger.info(
+        "DebeziumProvider {} exit. Server: {}}.", providerConfig.name, providerConfig.server);
 
     return 0L;
   }
@@ -208,7 +213,7 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
     Transformer transformer = idleTransformer.poll();
 
     if (transformer == null) {
-      transformer = new MaxwellChangeTransformer(cxt);
+      transformer = new DebeziumTransformer(cxt);
     }
 
     transformer.setChangeSet(changeSet);
@@ -227,22 +232,22 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
   }
 
   /**
-   * {@code MaxwellCommitCallback} is a type of {@code Position}. It is used to mark the offset of
-   * data in <B>Maxwell</B> data source.
+   * {@code DebeziumCommitCallback} is a type of {@code CommitCallback}. It is used to mark the
+   * offset of data in <B>Debezium</B> data source.
    *
    * @author yuze
    *
    */
-  public class MaxwellCommitCallback extends AbstractCommitCallback {
+  public class DebeziumCommitCallback extends AbstractCommitCallback {
     public String type;
-    public MaxwellChangeProvider provider;
-    public HashMap<Integer, Long> partitionOffset;
+    public DebeziumProvider provider;
+    public HashMap<TopicPartition, Long> partitionOffset;
 
-    public MaxwellCommitCallback(Provider provider) {
+    public DebeziumCommitCallback(Provider provider) {
       super();
       this.type = PROVIDER_TYPE;
-      this.provider = (MaxwellChangeProvider) provider;
-      this.partitionOffset = new HashMap<Integer, Long>();
+      this.provider = (DebeziumProvider) provider;
+      this.partitionOffset = new HashMap<TopicPartition, Long>();
     }
 
     @Override
@@ -263,11 +268,9 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
       KafkaConsumer<String, String> consumer = provider.consumer;
       HashMap<TopicPartition, OffsetAndMetadata> offsets =
           new HashMap<TopicPartition, OffsetAndMetadata>();
-      String topic = provider.providerConfig.topic;
 
-      for (Entry<Integer, Long> offset : partitionOffset.entrySet()) {
-        offsets.put(new TopicPartition(topic, offset.getKey()),
-            new OffsetAndMetadata(offset.getValue() + 1));
+      for (Entry<TopicPartition, Long> offset : partitionOffset.entrySet()) {
+        offsets.put(offset.getKey(), new OffsetAndMetadata(offset.getValue() + 1));
       }
 
       consumer.commitSync(offsets);
@@ -277,19 +280,19 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
   }
 
   /**
-   * {@code MaxwellChangeTransformer} is a type of {@code Transformer}. It is used to transform data
-   * to {@code Row} from <B>Maxwell</B> data source.
+   * {@code DebeziumTransformer} is a type of {@code Transformer}. It is used to transform data to
+   * {@code Row} from <B>Debezium</B> data source.
    *
    * @author yuze
    *
    */
-  public class MaxwellChangeTransformer extends Transformer {
+  public class DebeziumTransformer extends Transformer {
     private static final char FIELD_DELIMITER = '|';
     private static final char NEWLINE = '\n';
     private static final char QUOTE = '"';
     private static final char ESCAPE = '\\';
 
-    private Logger logger = LogManager.getLogger("Dbsync." + MaxwellChangeTransformer.class);
+    private Logger logger = LogManager.getLogger("Dbsync." + DebeziumTransformer.class);
 
     protected Context cxt;
     protected HashMap<String, String> tableMap;
@@ -298,18 +301,30 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
     protected Gson gson;
 
     public class Record {
-      public String dataSource;
-      public String database;
-      public String table;
-      public String type;
-      public Long ts;
-      public Long xid;
-      public boolean commit;
+      public String topic;
+      public char op;
       public JsonObject data;
-      public JsonObject old;
+
+      public Record(String topic, JsonObject payLoad) {
+        this.topic = topic;
+        this.op = payLoad.get("op").getAsCharacter();
+
+        JsonElement element = null;
+        switch (op) {
+          case 'c':
+          case 'u':
+            element = payLoad.get("after");
+            break;
+          case 'd':
+            element = payLoad.get("before");
+            break;
+        }
+
+        this.data = element.getAsJsonObject();
+      }
     }
 
-    public MaxwellChangeTransformer(Context cxt) {
+    public DebeziumTransformer(Context cxt) {
       this.cxt = cxt;
       this.tableMap = cxt.tableMap;
       this.tupleStringBuilder = new StringBuilder();
@@ -320,42 +335,45 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
     @SuppressWarnings("unchecked")
     @Override
     public RowSet call() throws Exception {
-      Thread.currentThread().setName("MaxwellChangeTransformer");
+      Thread.currentThread().setName("DebeziumTransformer");
 
       RowSet set = cxt.idleRowSets.borrowObject();
       set.createdAt = changeSet.createdAt;
 
       CommitCallback callback = changeSet.callback;
-      HashMap<Integer, Long> offsets = ((MaxwellCommitCallback) callback).partitionOffset;
-      Record record;
+      HashMap<TopicPartition, Long> offsets = ((DebeziumCommitCallback) callback).partitionOffset;
+
       for (ConsumerRecord<String, String> change :
           (ConsumerRecords<String, String>) changeSet.changes) {
-        record = gson.fromJson(change.value(), Record.class);
-        record.dataSource = provider.getProviderName();
-        // filter
-        if (filter(record)) {
+        JsonParser jsonParser = new JsonParser();
+        JsonObject value = (JsonObject) jsonParser.parse(change.value());
+
+        if (!value.has("payload") || value.get("payload").isJsonNull()) {
           continue;
         }
 
-        // transform
-        switch (record.type) {
-          case "insert":
+        JsonObject payLoad = value.getAsJsonObject("payload");
+        Record record = new Record(change.topic(), payLoad);
+
+        switch (record.op) {
+          case 'c':
             addToRowSet(set, convertRecord(record, RowType.INSERT));
             break;
-          case "delete":
+          case 'd':
             addToRowSet(set, convertRecord(record, RowType.DELETE));
             break;
-          case "update":
+          case 'u':
             addToRowSet(set, convertRecord(record, RowType.UPDATE));
             break;
         }
-        offsets.put(change.partition(), change.offset());
+
+        offsets.put(new TopicPartition(change.topic(), change.partition()), change.offset());
       }
 
       callback.setNumOfTables(set.rowBucket.size());
       set.callback = callback;
-
       cxt.idleChangeSets.returnObject(changeSet);
+
       return set;
     }
 
@@ -415,8 +433,8 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
         String data = null;
         String columnName = table.columnName.get(columnIndex);
 
-        if (oldValue && record.old.has(columnName)) {
-          element = record.old.get(columnName);
+        if (oldValue && record.data.has(columnName)) {
+          element = record.data.get(columnName);
         } else {
           element = record.data.get(columnName);
         }
@@ -466,6 +484,7 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
 
             break;
           }
+
           default: {
             if (data != null) {
               tupleStringBuilder.append(data);
@@ -478,6 +497,7 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
           tupleStringBuilder.append(FIELD_DELIMITER);
         }
       }
+
       tupleStringBuilder.append(NEWLINE);
 
       return tupleStringBuilder.toString();
@@ -498,11 +518,11 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
     }
 
     private String getMappedTableName(Record record) {
-      return tableMap.get(record.dataSource + "." + record.database + "." + record.table);
+      return tableMap.get(record.topic);
     }
 
     private String getOriginTableName(Record record) {
-      return record.dataSource + "." + record.database + "." + record.table;
+      return record.topic;
     }
 
     private void addToRowSet(RowSet set, Row row) throws InterruptedException, Exception {
@@ -518,22 +538,10 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
       array.add(row);
     }
 
-    private Boolean filter(Record record) throws DbsyncException {
-      String fullTableName = record.dataSource + "." + record.database + "." + record.table;
-
-      MaxwellChangeProvider p = (MaxwellChangeProvider) changeSet.provider;
-      if (!p.providerConfig.tableMap.containsKey(fullTableName)) {
-        // Do not sync this table
-        return true;
-      }
-
-      return false;
-    }
-
     /**
-     * Convert Record from maxwell to dbsync internal format.
+     * Convert Record from debezium to dbsync internal format.
      *
-     * @param record {@code Record} from maxwell
+     * @param record {@code Record} from debezium
      * @param type insert, update or delete
      * @return the converted row
      * @throws DbsyncException - Exception while borrow from pool
@@ -552,15 +560,8 @@ public class MaxwellChangeProvider implements Callable<Long>, Provider {
       row.mappedTable = getMappedTableName(record);
       row.keys = formatKeys(record, table, false);
 
-      if (type == RowType.INSERT) {
+      if (type != RowType.DELETE) {
         row.tuple = formatTuple(record, table);
-      } else if (type == RowType.UPDATE) {
-        row.tuple = formatTuple(record, table);
-        row.oldKeys = formatKeys(record, table, true);
-
-        if (row.keys.equals(row.oldKeys)) {
-          row.oldKeys = null;
-        }
       }
 
       return row;

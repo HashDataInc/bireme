@@ -46,6 +46,7 @@ public class Config {
   public ArrayList<String> dataSource;
   public ArrayList<String> dataSourceType;
   public ArrayList<MaxwellConfig> maxwellConf;
+  public ArrayList<DebeziumConfig> debeziumConf;
   public HashMap<String, String> tableMap;
   public int loadersCount;
 
@@ -59,6 +60,12 @@ public class Config {
     public String name;
     public String server;
     public String topic;
+    public HashMap<String, String> tableMap;
+  }
+
+  public static class DebeziumConfig {
+    public String name;
+    public String server;
     public HashMap<String, String> tableMap;
   }
 
@@ -108,6 +115,7 @@ public class Config {
     dataSourceType = new ArrayList<String>();
     tableMap = new HashMap<String, String>();
     maxwellConf = new ArrayList<MaxwellConfig>();
+    debeziumConf = new ArrayList<DebeziumConfig>();
   }
 
   protected void getConnectionConfig() throws DbsyncException {
@@ -158,6 +166,13 @@ public class Config {
           conf.tableMap = fetchTableMap(conf.name);
           maxwellConf.add(conf);
           break;
+
+        case "debezium":
+          DebeziumConfig dconf = fetchDebeziumConfig(name);
+          dconf.tableMap = fetchTableMap(dconf.name);
+          debeziumConf.add(dconf);
+          break;
+
         default:
           String message = "Unrecognized type for data source " + name;
           logger.fatal(message);
@@ -168,6 +183,22 @@ public class Config {
     if (loader_conn_size > loadersCount) {
       loader_conn_size = loadersCount;
     }
+  }
+
+  protected DebeziumConfig fetchDebeziumConfig(String prefix) throws DbsyncException {
+    Configuration subConfig = new SubsetConfiguration(config, prefix, ".");
+    DebeziumConfig debeziumConf = new DebeziumConfig();
+
+    debeziumConf.name = prefix;
+    debeziumConf.server = subConfig.getString("kafka.server");
+
+    if (debeziumConf.server == null) {
+      String message = "Please designate server for " + prefix + ".";
+      logger.fatal(message);
+      throw new DbsyncException(message);
+    }
+
+    return debeziumConf;
   }
 
   /**

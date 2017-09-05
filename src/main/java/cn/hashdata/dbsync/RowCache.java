@@ -122,7 +122,7 @@ public class RowCache {
    *
    * @return the batch
    * @throws InterruptedException if interrupted while waiting
-   * @throws DbsyncException Exception while borrow from pool
+   * @throws DbsyncException - Exception while borrow from pool
    */
   public RowBatchMerger fetchBatch() throws InterruptedException, DbsyncException {
     createBatch();
