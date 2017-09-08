@@ -27,10 +27,11 @@ import org.powermock.api.mockito.PowerMockito;
 import com.codahale.metrics.Meter;
 import com.google.gson.Gson;
 
+import cn.hashdata.dbsync.Provider.Transformer;
 import cn.hashdata.dbsync.Row.RowType;
 import cn.hashdata.dbsync.provider.MaxwellChangeProvider;
 import cn.hashdata.dbsync.provider.MaxwellChangeProvider.MaxwellChangeTransformer;
-import cn.hashdata.dbsync.provider.MaxwellChangeProvider.MaxwellChangeTransformer.Record;
+import cn.hashdata.dbsync.provider.MaxwellChangeProvider.MaxwellChangeTransformer.MaxwellRecord;
 
 import java.lang.reflect.Field;
 import java.sql.Types;
@@ -59,7 +60,7 @@ public class MaxwellChangeProviderTest {
     TestUtil.addMaxellDataSource(conf, 1);
     cxt = new Context(conf, true);
     gson = new Gson();
-    provider = new MaxwellChangeProvider(cxt, conf.maxwellConf.get(0), true);
+    provider = new MaxwellChangeProvider(cxt, conf.maxwellConf.get(0));
     MockitoAnnotations.initMocks(this);
   }
 
@@ -96,7 +97,7 @@ public class MaxwellChangeProviderTest {
         (MaxwellChangeTransformer) provider.borrowTransformer(mockChangeSet);
     String change =
         "{\"database\":\"demo\",\"table\":\"test\",\"type\":\"update\",\"ts\":1503728889,\"xid\":5024,\"commit\":true,\"data\":{\"column0\":1, \"column1\":\"dbsync\"},\"old\":{\"column0\":2}}";
-    Record record = gson.fromJson(change, Record.class);
+    MaxwellRecord record = gson.fromJson(change, MaxwellRecord.class);
 
     ArrayList<Integer> types = new ArrayList<Integer>();
     types.add(Types.INTEGER);

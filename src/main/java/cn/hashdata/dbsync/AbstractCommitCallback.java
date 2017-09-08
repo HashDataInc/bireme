@@ -39,11 +39,7 @@ public abstract class AbstractCommitCallback implements CommitCallback {
   }
 
   @Override
-  public boolean ready() throws DbsyncException {
-    if (committed.get()) {
-      throw new DbsyncException("already committed!");
-    }
-
+  public boolean ready() {
     return ready.get();
   }
 }

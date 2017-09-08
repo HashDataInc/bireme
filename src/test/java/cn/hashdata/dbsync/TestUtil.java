@@ -5,12 +5,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import cn.hashdata.dbsync.Config.ConnectionConfig;
-import cn.hashdata.dbsync.Config.MaxwellConfig;
+import cn.hashdata.dbsync.provider.KafkaProviderConfig;
 
 public class TestUtil {
   public static void addMaxellDataSource(Config conf, int tableCount) {
     String name = "datasource_" + conf.dataSource.size();
-    MaxwellConfig maxwellConfig = new MaxwellConfig();
+    KafkaProviderConfig maxwellConfig = new KafkaProviderConfig();
     maxwellConfig.name = name;
     maxwellConfig.server = "127.0.0.1:9092";
     maxwellConfig.topic = name;

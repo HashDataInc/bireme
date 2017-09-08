@@ -13,6 +13,8 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import cn.hashdata.dbsync.provider.KafkaProviderConfig;
+
 /**
  * Configurations about dbsync.
  *
@@ -45,8 +47,8 @@ public class Config {
 
   public ArrayList<String> dataSource;
   public ArrayList<String> dataSourceType;
-  public ArrayList<MaxwellConfig> maxwellConf;
-  public ArrayList<DebeziumConfig> debeziumConf;
+  public ArrayList<KafkaProviderConfig> maxwellConf;
+  public ArrayList<KafkaProviderConfig> debeziumConf;
   public HashMap<String, String> tableMap;
   public int loadersCount;
 
@@ -56,22 +58,9 @@ public class Config {
     public String passwd;
   }
 
-  public static class MaxwellConfig {
-    public String name;
-    public String server;
-    public String topic;
-    public HashMap<String, String> tableMap;
-  }
-
-  public static class DebeziumConfig {
-    public String name;
-    public String server;
-    public HashMap<String, String> tableMap;
-  }
-
   public Config() {
     config = new PropertiesConfiguration();
-    getBasicConfig();
+    basicConfig();
   }
 
   /**
@@ -85,14 +74,14 @@ public class Config {
     Configurations configs = new Configurations();
     config = configs.properties(new File(configFile));
 
-    getBasicConfig();
-    getConnectionConfig();
-    getDataSourceConfig();
+    basicConfig();
+    connectionConfig();
+    dataSourceConfig();
 
     logConfig();
   }
 
-  protected void getBasicConfig() {
+  protected void basicConfig() {
     reporter = config.getString("metrics.reporter", "console");
     report_interval = config.getInt("metrics.reporter.console.interval", 15);
 
@@ -114,11 +103,11 @@ public class Config {
     dataSource = new ArrayList<String>();
     dataSourceType = new ArrayList<String>();
     tableMap = new HashMap<String, String>();
-    maxwellConf = new ArrayList<MaxwellConfig>();
-    debeziumConf = new ArrayList<DebeziumConfig>();
+    maxwellConf = new ArrayList<KafkaProviderConfig>();
+    debeziumConf = new ArrayList<KafkaProviderConfig>();
   }
 
-  protected void getConnectionConfig() throws DbsyncException {
+  protected void connectionConfig() throws DbsyncException {
     target = getConnConfig("target");
     if (target.jdbcUrl == null) {
       String message = "Please designate url for target Database.";
@@ -132,7 +121,24 @@ public class Config {
     }
   }
 
-  protected void getDataSourceConfig() throws DbsyncException {
+  /**
+   * Get the connection configuration to database.
+   *
+   * @param prefix "target" or "bookkeeping" database
+   * @return {@code ConnectionConfig} to database.
+   */
+  protected ConnectionConfig getConnConfig(String prefix) {
+    Configuration subConfig = new SubsetConfiguration(config, prefix, ".");
+    ConnectionConfig connectionConfig = new ConnectionConfig();
+
+    connectionConfig.jdbcUrl = subConfig.getString("url");
+    connectionConfig.user = subConfig.getString("user");
+    connectionConfig.passwd = subConfig.getString("passwd");
+
+    return connectionConfig;
+  }
+
+  protected void dataSourceConfig() throws DbsyncException {
     String[] sources = config.getString("data_source").replaceAll("[ \f\n\r\t]", "").split(",");
     if (sources == null || sources.length == 0) {
       String message = "Please designate at least one data source.";
@@ -162,13 +168,13 @@ public class Config {
 
       switch (type) {
         case "maxwell":
-          MaxwellConfig conf = fetchMaxwellProviderConfig(name);
+          KafkaProviderConfig conf = fetchMaxwellConfig(name);
           conf.tableMap = fetchTableMap(conf.name);
           maxwellConf.add(conf);
           break;
 
         case "debezium":
-          DebeziumConfig dconf = fetchDebeziumConfig(name);
+          KafkaProviderConfig dconf = fetchDebeziumConfig(name);
           dconf.tableMap = fetchTableMap(dconf.name);
           debeziumConf.add(dconf);
           break;
@@ -185,12 +191,13 @@ public class Config {
     }
   }
 
-  protected DebeziumConfig fetchDebeziumConfig(String prefix) throws DbsyncException {
+  protected KafkaProviderConfig fetchDebeziumConfig(String prefix) throws DbsyncException {
     Configuration subConfig = new SubsetConfiguration(config, prefix, ".");
-    DebeziumConfig debeziumConf = new DebeziumConfig();
+    KafkaProviderConfig debeziumConf = new KafkaProviderConfig();
 
     debeziumConf.name = prefix;
     debeziumConf.server = subConfig.getString("kafka.server");
+    debeziumConf.topic = prefix;
 
     if (debeziumConf.server == null) {
       String message = "Please designate server for " + prefix + ".";
@@ -202,32 +209,15 @@ public class Config {
   }
 
   /**
-   * Get the connection configuration to database.
-   *
-   * @param prefix "target" or "bookkeeping" database
-   * @return {@code ConnectionConfig} to database.
-   */
-  protected ConnectionConfig getConnConfig(String prefix) {
-    Configuration subConfig = new SubsetConfiguration(config, prefix, ".");
-    ConnectionConfig connectionConfig = new ConnectionConfig();
-
-    connectionConfig.jdbcUrl = subConfig.getString("url");
-    connectionConfig.user = subConfig.getString("user");
-    connectionConfig.passwd = subConfig.getString("passwd");
-
-    return connectionConfig;
-  }
-
-  /**
    * Get {@code MaxwellProvider} configuration.
    *
    * @param prefix the Provider's name
    * @return {@code MaxwellConfig} for {@code MaxwellProvider}
    * @throws DbsyncException - wrap and throw Exception which cannot be handled
    */
-  protected MaxwellConfig fetchMaxwellProviderConfig(String prefix) throws DbsyncException {
+  protected KafkaProviderConfig fetchMaxwellConfig(String prefix) throws DbsyncException {
     Configuration subConfig = new SubsetConfiguration(config, prefix, ".");
-    MaxwellConfig maxwellConf = new MaxwellConfig();
+    KafkaProviderConfig maxwellConf = new KafkaProviderConfig();
 
     maxwellConf.name = prefix;
     maxwellConf.server = subConfig.getString("kafka.server");

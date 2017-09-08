@@ -17,6 +17,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import cn.hashdata.dbsync.Provider.Transformer;
+
 /**
  * {@code Dispatcher} constantly poll {@code ChangeSet} and offer the {@code ChangeSet} to right
  * {@code Transformer}. After transformation complete, {@code Dispatcher} insert the result to
@@ -104,7 +106,8 @@ public class Dispatcher implements Callable<Long> {
         results.remove();
 
         Transformer trans = transformers.take();
-        trans.getProvider().returnTransformer(trans);
+        Provider provider = trans.getProvider();
+        provider.returnTransformer(trans);
 
         try {
           rowSet = head.get();
