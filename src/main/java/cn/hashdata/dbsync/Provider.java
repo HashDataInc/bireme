@@ -6,8 +6,6 @@ import java.util.HashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import cn.hashdata.dbsync.provider.Record;
-
 /**
  * {@code Provider} is responsible for polling data from data source and provide to
  * {@code Dispatcher}. Each {@code Provider} must have a unique name and maintain a pool of
@@ -50,6 +48,7 @@ public abstract class Provider implements Callable<Long> {
     if (transformer == null) {
       transformer = createTransformer();
     }
+
     transformer.setChangeSet(changeSet);
 
     return transformer;
@@ -91,6 +90,7 @@ public abstract class Provider implements Callable<Long> {
         String message = "Can't not borrow RowSet from the Object Pool.";
         throw new DbsyncException(message, e);
       }
+
       fillRowSet(rowSet);
 
       cxt.idleChangeSets.returnObject(changeSet);
@@ -130,7 +130,7 @@ public abstract class Provider implements Callable<Long> {
           case Types.VARBINARY: {
             if (data != null) {
               byte[] decoded = null;
-              decoded = decodeString(data);
+              decoded = decodeToBinary(data);
               tupleStringBuilder.append(escapeBinary(decoded));
             }
             break;
@@ -139,9 +139,7 @@ public abstract class Provider implements Callable<Long> {
           case Types.BIT: {
             if (data != null) {
               int precision = table.columnPrecision.get(columnIndex);
-              String binaryStr = Integer.toBinaryString(Integer.valueOf(data));
-              tupleStringBuilder.append(
-                  String.format("%" + precision + "s", binaryStr).replace(' ', '0'));
+              tupleStringBuilder.append(decodeToBit(data, precision));
             }
             break;
           }
@@ -163,7 +161,9 @@ public abstract class Provider implements Callable<Long> {
       return tupleStringBuilder.toString();
     }
 
-    protected abstract byte[] decodeString(String data);
+    // TODO add comment
+    protected abstract byte[] decodeToBinary(String data);
+    protected abstract String decodeToBit(String data, int precision);
 
     protected String escapeString(String data) {
       fieldStringBuilder.setLength(0);

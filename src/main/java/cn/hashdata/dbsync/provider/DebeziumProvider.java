@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
@@ -15,6 +16,7 @@ import com.google.gson.JsonParser;
 
 import cn.hashdata.dbsync.Context;
 import cn.hashdata.dbsync.DbsyncException;
+import cn.hashdata.dbsync.Record;
 import cn.hashdata.dbsync.Row;
 import cn.hashdata.dbsync.Row.RowType;
 import cn.hashdata.dbsync.Table;
@@ -81,10 +83,12 @@ public class DebeziumProvider extends KafkaProvider {
             type = RowType.INSERT;
             element = payLoad.get("after");
             break;
+
           case 'u':
             type = RowType.UPDATE;
             element = payLoad.get("after");
             break;
+
           case 'd':
             type = RowType.DELETE;
             element = payLoad.get("before");
@@ -109,8 +113,7 @@ public class DebeziumProvider extends KafkaProvider {
     }
 
     public DebeziumTransformer() {
-      this.tupleStringBuilder = new StringBuilder();
-      this.fieldStringBuilder = new StringBuilder();
+      super();
       this.gson = new Gson();
     }
 
@@ -166,7 +169,7 @@ public class DebeziumProvider extends KafkaProvider {
     }
 
     @Override
-    public Row transform(ConsumerRecord<String, String> change) {
+    public Row transform(ConsumerRecord<String, String> change, Row row) {
       JsonParser jsonParser = new JsonParser();
       JsonObject value = (JsonObject) jsonParser.parse(change.value());
 
@@ -178,14 +181,6 @@ public class DebeziumProvider extends KafkaProvider {
       DebeziumRecord record = new DebeziumRecord(change.topic(), payLoad);
 
       Table table = cxt.tablesInfo.get(getMappedTableName(record));
-      Row row = null;
-
-      try {
-        row = cxt.idleRows.borrowObject();
-      } catch (Exception e) {
-        String message = "Can't not borrow RowSet from the Object Pool.";
-        new DbsyncException(message, e);
-      }
 
       row.type = record.type;
       row.originTable = getOriginTableName(record);
@@ -200,11 +195,35 @@ public class DebeziumProvider extends KafkaProvider {
     }
 
     @Override
-    protected byte[] decodeString(String data) {
-      // TODO
+    protected byte[] decodeToBinary(String data) { // TODO
       byte[] decoded = null;
       decoded = Base64.decodeBase64(data);
       return decoded;
+    }
+
+    @Override
+    protected String decodeToBit(String data, int precision) {
+      switch (data) {
+        case "true":
+          return "1";
+        case "false":
+          return "2";
+      }
+
+      StringBuilder sb = new StringBuilder();
+      String oneByte;
+      String result;
+      byte[] decoded = Base64.decodeBase64(data);
+      
+      ArrayUtils.reverse(decoded);
+      
+      for (byte b : decoded) {
+        oneByte = String.format("%8s", Integer.toBinaryString(b & 0xFF)).replace(' ', '0');
+        sb.append(oneByte);
+      }
+      result = sb.toString();
+      
+      return result.substring(result.length() - precision);
     }
   }
 }

@@ -48,6 +48,7 @@ public abstract class KafkaProvider extends Provider {
 
   private void checkAndCommit() {
     CommitCallback callback = null;
+
     while (!commitCallbacks.isEmpty()) {
       if (commitCallbacks.peek().ready()) {
         callback = commitCallbacks.remove();
@@ -64,7 +65,7 @@ public abstract class KafkaProvider extends Provider {
   private Properties kafkaProps() {
     Properties props = new Properties();
     props.put("bootstrap.servers", providerConfig.server);
-    props.put("group.id", "dbsync");
+    props.put("group.id", "dbsync22");
     props.put("enable.auto.commit", false);
     props.put("session.timeout.ms", 30000);
     props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
@@ -98,6 +99,7 @@ public abstract class KafkaProvider extends Provider {
     ConsumerRecords<String, String> records = null;
     ChangeSet changeSet = null;
     boolean success = false;
+
     try {
       while (!cxt.stop) {
         do {
@@ -110,12 +112,14 @@ public abstract class KafkaProvider extends Provider {
         }
 
         KafkaCommitCallback callback = new KafkaCommitCallback();
+
         if (!commitCallbacks.offer(callback)) {
           String Message = "Can't add CommitCallback to queue.";
           throw new DbsyncException(Message);
         }
 
         changeSet = packRecords(records, callback);
+
         do {
           success = changeSetOut.offer(changeSet, TIMEOUT_MS, TimeUnit.MILLISECONDS);
           checkAndCommit();
@@ -141,8 +145,15 @@ public abstract class KafkaProvider extends Provider {
 
       for (ConsumerRecord<String, String> change :
           (ConsumerRecords<String, String>) changeSet.changes) {
-        row = transform(change);
-        if (row == null) {
+        try {
+          row = cxt.idleRows.borrowObject();
+        } catch (Exception e) {
+          String message = "Can't not borrow RowSet from the Object Pool.";
+          new DbsyncException(message, e);
+        }
+
+        if (transform(change, row) == null) {
+          cxt.idleRows.returnObject(row);
           continue;
         }
 
@@ -154,7 +165,7 @@ public abstract class KafkaProvider extends Provider {
       rowSet.callback = callback;
     }
 
-    public abstract Row transform(ConsumerRecord<String, String> change);
+    public abstract Row transform(ConsumerRecord<String, String> change, Row row);
   }
 
   public class KafkaCommitCallback extends AbstractCommitCallback {
@@ -166,20 +177,16 @@ public abstract class KafkaProvider extends Provider {
 
     @Override
     public String getType() {
-      // TODO Auto-generated method stub
       return null;
     }
 
     @Override
     public String toStirng() {
-      // TODO Auto-generated method stub
       return null;
     }
 
     @Override
-    public void fromString(String str) {
-      // TODO Auto-generated method stub
-    }
+    public void fromString(String str) {}
 
     @Override
     public void commit() {

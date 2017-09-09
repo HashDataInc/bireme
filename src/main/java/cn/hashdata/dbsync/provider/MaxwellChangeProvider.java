@@ -15,6 +15,7 @@ import com.google.gson.JsonParser;
 
 import cn.hashdata.dbsync.Context;
 import cn.hashdata.dbsync.DbsyncException;
+import cn.hashdata.dbsync.Record;
 import cn.hashdata.dbsync.Row;
 import cn.hashdata.dbsync.Row.RowType;
 import cn.hashdata.dbsync.Table;
@@ -114,6 +115,7 @@ public class MaxwellChangeProvider extends KafkaProvider {
       public String getField(String fieldName, boolean oldValue) {
         JsonElement element = null;
         String field = null;
+
         if (oldValue && old.has(fieldName)) {
           element = old.get(fieldName);
         } else {
@@ -123,6 +125,7 @@ public class MaxwellChangeProvider extends KafkaProvider {
         if (!element.isJsonNull()) {
           field = element.getAsString();
         }
+
         return field;
       }
     }
@@ -203,14 +206,20 @@ public class MaxwellChangeProvider extends KafkaProvider {
     }
 
     @Override
-    protected byte[] decodeString(String data) {
+    protected byte[] decodeToBinary(String data) {
       byte[] decoded = null;
       decoded = Base64.decodeBase64(data);
       return decoded;
     }
 
     @Override
-    public Row transform(ConsumerRecord<String, String> change) {
+    protected String decodeToBit(String data, int precision) {
+      String binaryStr = Integer.toBinaryString(Integer.valueOf(data));
+      return String.format("%" + precision + "s", binaryStr).replace(' ', '0');
+    }
+
+    @Override
+    public Row transform(ConsumerRecord<String, String> change, Row row) {
       MaxwellRecord record = new MaxwellRecord(change.value());
 
       if (filter(record)) {
@@ -218,13 +227,6 @@ public class MaxwellChangeProvider extends KafkaProvider {
       }
 
       Table table = cxt.tablesInfo.get(getMappedTableName(record));
-      Row row = null;
-
-      try {
-        row = cxt.idleRows.borrowObject();
-      } catch (Exception e) {
-        new DbsyncException(e.getCause());
-      }
 
       row.type = record.type;
       row.originTable = getOriginTableName(record);
