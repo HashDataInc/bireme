@@ -170,12 +170,12 @@ public class MaxwellChangeProvider extends KafkaProvider {
     }
 
     /**
-     * Convert Record from maxwell to dbsync internal format.
+     * Convert {@code MaxwellRecord} into {@code Row}.
      *
-     * @param record {@code Record} from maxwell
+     * @param record {@code MaxwellRecord} from Maxwell, which is extracted from change data
      * @param type insert, update or delete
      * @return the converted row
-     * @throws DbsyncException - Exception while borrow from pool
+     * @throws DbsyncException Exception while borrow from pool
      */
     public Row convertRecord(MaxwellRecord record, RowType type) throws DbsyncException {
       Table table = cxt.tablesInfo.get(getMappedTableName(record));
@@ -219,11 +219,11 @@ public class MaxwellChangeProvider extends KafkaProvider {
     }
 
     @Override
-    public Row transform(ConsumerRecord<String, String> change, Row row) {
+    public boolean transform(ConsumerRecord<String, String> change, Row row) {
       MaxwellRecord record = new MaxwellRecord(change.value());
 
       if (filter(record)) {
-        return null;
+        return false;
       }
 
       Table table = cxt.tablesInfo.get(getMappedTableName(record));
@@ -244,7 +244,7 @@ public class MaxwellChangeProvider extends KafkaProvider {
         }
       }
 
-      return row;
+      return true;
     }
   }
 }

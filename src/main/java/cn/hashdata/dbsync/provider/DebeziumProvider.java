@@ -140,12 +140,12 @@ public class DebeziumProvider extends KafkaProvider {
     }
 
     /**
-     * Convert Record from debezium to dbsync internal format.
+     * Convert {@code DebeziumRecord} into {@code Row}.
      *
-     * @param record {@code Record} from debezium
+     * @param record {@code DebeziumRecord} from Debezium, which is extracted from change data
      * @param type insert, update or delete
      * @return the converted row
-     * @throws DbsyncException - Exception while borrow from pool
+     * @throws DbsyncException Exception while borrow from pool
      */
     public Row convertRecord(DebeziumRecord record, RowType type) throws DbsyncException {
       Table table = cxt.tablesInfo.get(getMappedTableName(record));
@@ -169,12 +169,12 @@ public class DebeziumProvider extends KafkaProvider {
     }
 
     @Override
-    public Row transform(ConsumerRecord<String, String> change, Row row) {
+    public boolean transform(ConsumerRecord<String, String> change, Row row) {
       JsonParser jsonParser = new JsonParser();
       JsonObject value = (JsonObject) jsonParser.parse(change.value());
 
       if (!value.has("payload") || value.get("payload").isJsonNull()) {
-        return null;
+        return false;
       }
 
       JsonObject payLoad = value.getAsJsonObject("payload");
@@ -191,11 +191,11 @@ public class DebeziumProvider extends KafkaProvider {
         row.tuple = formatTuple(record, table);
       }
 
-      return row;
+      return true;
     }
 
     @Override
-    protected byte[] decodeToBinary(String data) { // TODO
+    protected byte[] decodeToBinary(String data) {
       byte[] decoded = null;
       decoded = Base64.decodeBase64(data);
       return decoded;

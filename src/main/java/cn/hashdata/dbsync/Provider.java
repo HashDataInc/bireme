@@ -8,8 +8,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * {@code Provider} is responsible for polling data from data source and provide to
- * {@code Dispatcher}. Each {@code Provider} must have a unique name and maintain a pool of
- * {@code Transformer}, which could transform the polled data to dbsync inner format.
+ * {@code Dispatcher}. Each {@code Provider} must its own {@code Transformer}, which could transform
+ * the polled data to dbsync inner format.
  *
  * @author yuze
  *
@@ -29,15 +29,31 @@ public abstract class Provider implements Callable<Long> {
     this.idleTransformer = new LinkedBlockingQueue<Transformer>();
   }
 
+  /**
+   * Get the type of the provider.
+   * 
+   * @return the type of the provider
+   */
   abstract public String getProviderType();
 
+  /**
+   * Get the unique name for the provider, which is specified in the configuration file.
+   * 
+   * @return the name for the provider
+   */
   abstract public String getProviderName();
 
+  /**
+   * Create a new transformer corresponding to the provider.
+   * 
+   * @return the new created transformer
+   */
   abstract public Transformer createTransformer();
 
   /**
-   * Borrow a {@code Transformer} from the maintained pool. This method should be non-blocking. If
-   * no {@code Transformer} is available currently, create a new {@code Transformer}.
+   * Borrow a {@code Transformer} from the {@code Provider} and set the {@code ChangeSet} to be
+   * transformer. This method should be non-blocking. If no {@code Transformer} is available
+   * currently, create a new {@code Transformer}.
    *
    * @param changeSet The {@code ChangeSet} that need to be transformed.
    * @return The borrowed {@code Transformer}.
@@ -64,6 +80,12 @@ public abstract class Provider implements Callable<Long> {
     idleTransformer.offer(trans);
   }
 
+  /**
+   * {@code Transformer} convert a group of change data to unified form.
+   * 
+   * @author yuze
+   *
+   */
   public abstract class Transformer implements Callable<RowSet> {
     private static final char FIELD_DELIMITER = '|';
     private static final char NEWLINE = '\n';
@@ -79,6 +101,10 @@ public abstract class Provider implements Callable<Long> {
       fieldStringBuilder = new StringBuilder();
     }
 
+    /**
+     * Borrow an empty {@code RowSet} and write the data acquired from {@code ChangeSet} to the
+     * {@code RowSet}. Finally, return the filled {@code RowSet}.
+     */
     @Override
     public RowSet call() throws DbsyncException {
       RowSet rowSet = null;
@@ -98,8 +124,18 @@ public abstract class Provider implements Callable<Long> {
       return rowSet;
     }
 
-    protected String formatColumns(
-        Record record, Table table, ArrayList<Integer> columns, boolean oldValue) {
+    /**
+     * Format the change data into csv tuple, which is then loaded to database by COPY.
+     * 
+     * @param record contain change data polled by {@code Provider}.
+     * @param table metadata of the target table
+     * @param columns the indexes of columns to assemble a csv tuple
+     * @param oldValue only for update operation when primary key was updated, we need to get the
+     *        old key and delete the old tuple
+     * @return
+     */
+    protected String formatColumns(Record record, Table table, ArrayList<Integer> columns,
+        boolean oldValue) {
       tupleStringBuilder.setLength(0);
 
       for (int i = 0; i < columns.size(); ++i) {
@@ -161,10 +197,31 @@ public abstract class Provider implements Callable<Long> {
       return tupleStringBuilder.toString();
     }
 
-    // TODO add comment
+    /**
+     * For binary type, {@code Transformer} need to decode the extracted string and decode it to
+     * origin binary.
+     * 
+     * @param data the encoded string
+     * @return the array of byte, decode result
+     */
     protected abstract byte[] decodeToBinary(String data);
-    protected abstract String decodeToBit(String data, int precision);
+    
+    /**
+     * For bit type, {@code Transformer} need to decode the extracted string and decode it to
+     * origin bit.
+     * 
+     * @param data the encoded string
+     * @param precision the length of the bit field, acquired from the table's metadata
+     * @return the  string of 1 or 0
+     */
 
+    protected abstract String decodeToBit(String data, int precision);
+    
+    /**
+     * Add escape character to a data string.
+     * @param data the origin string
+     * @return the modified string
+     */
     protected String escapeString(String data) {
       fieldStringBuilder.setLength(0);
 
@@ -186,6 +243,12 @@ public abstract class Provider implements Callable<Long> {
       return fieldStringBuilder.toString();
     }
 
+    /**
+     * Encode the binary data into string for COPY into target database.
+     * 
+     * @param data the origin binary data
+     * @return the encoded string
+     */
     protected String escapeBinary(byte[] data) {
       fieldStringBuilder.setLength(0);
 
@@ -211,16 +274,39 @@ public abstract class Provider implements Callable<Long> {
       return fieldStringBuilder.toString();
     }
 
+    /**
+     * Appoint a {@code ChangeSet} to the {@code Transformer}
+     * 
+     * @param changeSet a package of change data
+     */
     public void setChangeSet(ChangeSet changeSet) {
       this.changeSet = changeSet;
     }
 
+    /**
+     * Write the change data into a {@code RowSet}.
+     * 
+     * @param rowSet a empty {@code RowSet} to store change data
+     * @throws DbsyncException Exceptions when fill the {@code RowSet}
+     */
     public abstract void fillRowSet(RowSet rowSet) throws DbsyncException;
 
+    /**
+     * Get the outer {@code Provider} of this {@code Transformer}.
+     * 
+     * @return the outer {@code Provider}
+     */
     public Provider getProvider() {
       return Provider.this;
     }
 
+    /**
+     * After convert a single change data to a {@code Row}, insert into the {@code RowSet}.
+     * 
+     * @param row the converted change data
+     * @param rowSet the {@code RowSet} to organize the {@code Row}
+     * @throws DbsyncException Exceptions when add {@code Row} to {@code RowSet}
+     */
     public void addToRowSet(Row row, RowSet rowSet) throws DbsyncException {
       HashMap<String, ArrayList<Row>> bucket = rowSet.rowBucket;
       String mappedTable = row.mappedTable;

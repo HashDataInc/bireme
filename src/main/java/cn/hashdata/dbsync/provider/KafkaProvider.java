@@ -22,16 +22,30 @@ import cn.hashdata.dbsync.Provider;
 import cn.hashdata.dbsync.Row;
 import cn.hashdata.dbsync.RowSet;
 
+/**
+ * {@code KafkaProvider} is able to poll change data from Kafka.
+ * 
+ * @author yuze
+ *
+ */
 public abstract class KafkaProvider extends Provider {
   protected static final Long TIMEOUT_MS = 1000L;
   public static final String ABSTRACT_PROVIDER_TYPE = "Kafka";
 
-  public enum SourceType { MAXWELL, DEBEZIUM }
+  public enum SourceType {
+    MAXWELL, DEBEZIUM
+  }
 
   public KafkaProviderConfig providerConfig;
   protected KafkaConsumer<String, String> consumer;
   private LinkedBlockingQueue<KafkaCommitCallback> commitCallbacks;
 
+  /**
+   * Create a new {@code kafkaProvider}.
+   * 
+   * @param cxt the {@code Context}
+   * @param providerConfig configuration for the {@code KafkaProvider}
+   */
   public KafkaProvider(Context cxt, KafkaProviderConfig providerConfig) {
     super(cxt);
     this.providerConfig = providerConfig;
@@ -92,8 +106,18 @@ public abstract class KafkaProvider extends Provider {
     return changeSet;
   }
 
+  /**
+   * Create a list of {@code TopicPartition} to subscribe according configuration.
+   * 
+   * @return an ArrayList of {@code TopicPartition}
+   */
   protected abstract ArrayList<TopicPartition> createTopicPartitions();
 
+  /**
+   * Start the {@code KafkaProvider}. It constantly poll data from the designated
+   * {@code TopicPartition} and pack the change data into {@code ChangeSet}, transfer it to the
+   * Change Set Queue in Context.
+   */
   @Override
   public Long call() throws DbsyncException, InterruptedException {
     ConsumerRecords<String, String> records = null;
@@ -135,6 +159,12 @@ public abstract class KafkaProvider extends Provider {
     return 0L;
   }
 
+  /**
+   * Loop through the {@code ChangeSet} and transform each change data into a {@code Row}.
+   * 
+   * @author yuze
+   *
+   */
   public abstract class KafkaTransformer extends Transformer {
     @SuppressWarnings("unchecked")
     @Override
@@ -143,8 +173,7 @@ public abstract class KafkaProvider extends Provider {
       HashMap<TopicPartition, Long> offsets = ((KafkaCommitCallback) callback).partitionOffset;
       Row row = null;
 
-      for (ConsumerRecord<String, String> change :
-          (ConsumerRecords<String, String>) changeSet.changes) {
+      for (ConsumerRecord<String, String> change : (ConsumerRecords<String, String>) changeSet.changes) {
         try {
           row = cxt.idleRows.borrowObject();
         } catch (Exception e) {
@@ -152,7 +181,7 @@ public abstract class KafkaProvider extends Provider {
           new DbsyncException(message, e);
         }
 
-        if (transform(change, row) == null) {
+        if (!transform(change, row)) {
           cxt.idleRows.returnObject(row);
           continue;
         }
@@ -165,7 +194,15 @@ public abstract class KafkaProvider extends Provider {
       rowSet.callback = callback;
     }
 
-    public abstract Row transform(ConsumerRecord<String, String> change, Row row);
+    /**
+     * Transform the change data into a {@code Row}.
+     * 
+     * @param change the change data
+     * @param row an empty {@code Row} to store the result.
+     * @return {@code true} if transform the change data successfully, {@code false} it the change
+     *         data is null or filtered
+     */
+    public abstract boolean transform(ConsumerRecord<String, String> change, Row row);
   }
 
   public class KafkaCommitCallback extends AbstractCommitCallback {
@@ -192,8 +229,9 @@ public abstract class KafkaProvider extends Provider {
     public void commit() {
       HashMap<TopicPartition, OffsetAndMetadata> offsets =
           new HashMap<TopicPartition, OffsetAndMetadata>();
-      partitionOffset.forEach(
-          (key, value) -> { offsets.put(key, new OffsetAndMetadata(value + 1)); });
+      partitionOffset.forEach((key, value) -> {
+        offsets.put(key, new OffsetAndMetadata(value + 1));
+      });
 
       consumer.commitSync(offsets);
       committed.set(true);
