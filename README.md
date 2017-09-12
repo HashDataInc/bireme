@@ -1,16 +1,16 @@
-# dbsync
+# bireme
 
 [中文文档](README_zh-cn.md)
 
-[Getting Started Guide](docs/dbsync_guide.md)
+[Getting Started Guide](docs/bireme_guide.md)
 
-Dbsync is an incremental synchronization tool for the Greenplum / HashData data warehouse. Currently supports MySQL data sources.
+Bireme is an incremental synchronization tool for the Greenplum / HashData data warehouse. Currently supports MySQL data sources.
 
 [Greenplum](http://greenplum.org/) is an advanced, fully functional open source data warehouse that provides powerful and fast analysis of the amount of petabyte data. It is uniquely oriented for large data analysis and is supported by the world's most advanced cost-based query optimizer. It can provide high query performance over large amounts of data.
 
 [HashData](http://www.hashdata.cn) is based on Greenplum to build flexible cloud data warehouses.
 
-Dbsync uses DELETE + COPY to synchronize the modification records of the data source to Greenplum / HashData. This mode is faster and better than INSERT + UPDATE + DELETE.
+Bireme uses DELETE + COPY to synchronize the modification records of the data source to Greenplum / HashData. This mode is faster and better than INSERT + UPDATE + DELETE.
 
 Features and Constraints:
 
@@ -22,11 +22,11 @@ Features and Constraints:
 
 ![architecture](docs/architecture.png)
 
-Dbsync supports synchronization work of multiple data sources. It can simultaneously read records from multiple data sources in parallel, and load records to the target database.
+Bireme supports synchronization work of multiple data sources. It can simultaneously read records from multiple data sources in parallel, and load records to the target database.
 
 ## 1.2 Maxwell + Kafka Data Source
 
-Maxwell + Kafka is a data source type that dbsync currently supports, the structure as follows:
+Maxwell + Kafka is a data source type that bireme currently supports, the structure as follows:
 
 ![data_source](docs/data_source.png)
 
@@ -35,15 +35,15 @@ Maxwell + Kafka is a data source type that dbsync currently supports, the struct
 
 ## 1.3 How does dbsyn work
 
-Dbsync reads records from the data source, converts it into an internal format and caches it. When the cached records reaches a certain amount, it is merged into a task, each task contains two collections, *delete*  collection and *insert* collection, and finally updates the records to the target database.
+Bireme reads records from the data source, converts it into an internal format and caches it. When the cached records reaches a certain amount, it is merged into a task, each task contains two collections, *delete*  collection and *insert* collection, and finally updates the records to the target database.
 
-![dbsync](docs/dbsync.png)
+![bireme](docs/bireme.png)
 
 ## 1.4 Introduction to configuration files
 
 The configuration files consist of two parts:
 
-* Basic configuration file: The default is **config.properties**, which contains the basic configuration of dbsync.
+* Basic configuration file: The default is **config.properties**, which contains the basic configuration of bireme.
 * Table mapping file: **\<source_name\>.properties**, each data source corresponds to a file, which specify the table to be synchronized and the corresponding table in the target database. \<Source_name\> is specified in the config.properties file.
 
 ### 1.4.1 config.properties
@@ -76,7 +76,7 @@ The configuration files consist of two parts:
 |bookkeeping.passwd|The password used to connect to the state database|The same as target.passwd|
 |bookkeep.interval|Interval between update of state database in milliseconds|1000|
 |bookkeep.table_name|table used to record status|bookkeeping|
-|metrics.reporter|Dbsync specifies two monitoring modes, consolo or jmx. If you do not need to monitor, you can specify this as none|console|
+|metrics.reporter|Bireme specifies two monitoring modes, consolo or jmx. If you do not need to monitor, you can specify this as none|console|
 |metrics.reporter.console.interval|Time interval between metrics output in seconds. It is valic as long as metrics.reporter is console.|10|
 |loader.conn_pool.size|Number of connections to target database, less or equal to the number of Change Loaders|10|
 |loader.task_queue.size|The length of task queue in each Change Loader|2|

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-NAME="dbsync"
-DESC="dbsync service"
+NAME="bireme"
+DESC="bireme service"
 BINDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOPDIR="$(cd "$(dirname "${BINDIR}")" && pwd)"
 
@@ -21,7 +21,7 @@ for f in ${TOPDIR}/lib/*.jar; do
   CLASS_PATH=$f:${CLASS_PATH}
 done
 
-CLASS="cn.hashdata.dbsync.Dbsync"
+CLASS="cn.hashdata.bireme.Bireme"
 
 CMD=$1
 

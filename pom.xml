@@ -3,10 +3,10 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>hashdata</groupId>
-	<artifactId>dbsync</artifactId>
+	<artifactId>bireme</artifactId>
 	<version>0.2.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
-	<name>dbsync</name>
+	<name>bireme</name>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

@@ -4,7 +4,7 @@
     <Console name="Console" target="SYSTEM_ERR">
       <PatternLayout pattern="%d{HH:mm:ss,SSS} %-5level %logger{1} - %msg%n"/>
     </Console>
-    <Console name="DbsyncConsole" target="SYSTEM_OUT">
+    <Console name="BiremeConsole" target="SYSTEM_OUT">
       <PatternLayout pattern="%d{HH:mm:ss} %-5level %logger{1} - %msg%n"/>"
     </Console>
   </Appenders>
@@ -12,8 +12,8 @@
     <Root level="error">
       <AppenderRef ref="Console"/>
     </Root>
-    <Logger name="Dbsync" level="info" additivity="false">  
-      <AppenderRef ref="DbsyncConsole" />  
+    <Logger name="Bireme" level="info" additivity="false">  
+      <AppenderRef ref="BiremeConsole" />  
     </Logger> 
   </Loggers>
 </Configuration>
