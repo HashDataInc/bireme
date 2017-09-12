@@ -6,6 +6,14 @@ import java.util.HashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import com.codahale.metrics.Meter;
+import com.codahale.metrics.MetricRegistry;
+
+import cn.hashdata.bireme.provider.ProviderConfig;
+
 /**
  * {@code Provider} is responsible for polling data from data source and provide to
  * {@code Dispatcher}. Each {@code Provider} must its own {@code Transformer}, which could transform
@@ -17,35 +25,47 @@ import java.util.concurrent.LinkedBlockingQueue;
 public abstract class Provider implements Callable<Long> {
   protected static final Long TIMEOUT_MS = 1000L;
 
+  protected Logger logger;
+  protected Meter recordMeter;
+
   protected Context cxt;
+  protected ProviderConfig conf;
   protected HashMap<String, String> tableMap;
   protected LinkedBlockingQueue<ChangeSet> changeSetOut;
-  private LinkedBlockingQueue<Transformer> idleTransformer;
+  protected LinkedBlockingQueue<Transformer> idleTransformer;
 
-  public Provider(Context cxt) {
+  public Provider(Context cxt, ProviderConfig conf) {
     this.cxt = cxt;
+    this.conf = conf;
     this.tableMap = cxt.tableMap;
     this.changeSetOut = cxt.changeSetQueue;
     this.idleTransformer = new LinkedBlockingQueue<Transformer>();
+
+    this.logger = LogManager.getLogger(Provider.class + getProviderName());
+    this.recordMeter = cxt.metrics.meter(MetricRegistry.name(Provider.class, getProviderName()));
   }
 
   /**
    * Get the type of the provider.
-   * 
+   *
    * @return the type of the provider
    */
-  abstract public String getProviderType();
+  public String getProviderType() {
+    return conf.type.toString();
+  }
 
   /**
    * Get the unique name for the provider, which is specified in the configuration file.
-   * 
+   *
    * @return the name for the provider
    */
-  abstract public String getProviderName();
+  public String getProviderName() {
+    return conf.name;
+  }
 
   /**
    * Create a new transformer corresponding to the provider.
-   * 
+   *
    * @return the new created transformer
    */
   abstract public Transformer createTransformer();
@@ -82,7 +102,7 @@ public abstract class Provider implements Callable<Long> {
 
   /**
    * {@code Transformer} convert a group of change data to unified form.
-   * 
+   *
    * @author yuze
    *
    */
@@ -126,7 +146,7 @@ public abstract class Provider implements Callable<Long> {
 
     /**
      * Format the change data into csv tuple, which is then loaded to database by COPY.
-     * 
+     *
      * @param record contain change data polled by {@code Provider}.
      * @param table metadata of the target table
      * @param columns the indexes of columns to assemble a csv tuple
@@ -134,8 +154,8 @@ public abstract class Provider implements Callable<Long> {
      *        old key and delete the old tuple
      * @return
      */
-    protected String formatColumns(Record record, Table table, ArrayList<Integer> columns,
-        boolean oldValue) {
+    protected String formatColumns(
+        Record record, Table table, ArrayList<Integer> columns, boolean oldValue) {
       tupleStringBuilder.setLength(0);
 
       for (int i = 0; i < columns.size(); ++i) {
@@ -200,23 +220,23 @@ public abstract class Provider implements Callable<Long> {
     /**
      * For binary type, {@code Transformer} need to decode the extracted string and decode it to
      * origin binary.
-     * 
+     *
      * @param data the encoded string
      * @return the array of byte, decode result
      */
     protected abstract byte[] decodeToBinary(String data);
-    
+
     /**
      * For bit type, {@code Transformer} need to decode the extracted string and decode it to
      * origin bit.
-     * 
+     *
      * @param data the encoded string
      * @param precision the length of the bit field, acquired from the table's metadata
      * @return the  string of 1 or 0
      */
 
     protected abstract String decodeToBit(String data, int precision);
-    
+
     /**
      * Add escape character to a data string.
      * @param data the origin string
@@ -230,7 +250,7 @@ public abstract class Provider implements Callable<Long> {
 
         switch (c) {
           case 0x00:
-            // logger.warn("illegal character 0x00, deleted.");
+            logger.warn("illegal character 0x00, deleted.");
             continue;
           case QUOTE:
           case ESCAPE:
@@ -245,7 +265,7 @@ public abstract class Provider implements Callable<Long> {
 
     /**
      * Encode the binary data into string for COPY into target database.
-     * 
+     *
      * @param data the origin binary data
      * @return the encoded string
      */
@@ -276,7 +296,7 @@ public abstract class Provider implements Callable<Long> {
 
     /**
      * Appoint a {@code ChangeSet} to the {@code Transformer}
-     * 
+     *
      * @param changeSet a package of change data
      */
     public void setChangeSet(ChangeSet changeSet) {
@@ -285,7 +305,7 @@ public abstract class Provider implements Callable<Long> {
 
     /**
      * Write the change data into a {@code RowSet}.
-     * 
+     *
      * @param rowSet a empty {@code RowSet} to store change data
      * @throws BiremeException Exceptions when fill the {@code RowSet}
      */
@@ -293,7 +313,7 @@ public abstract class Provider implements Callable<Long> {
 
     /**
      * Get the outer {@code Provider} of this {@code Transformer}.
-     * 
+     *
      * @return the outer {@code Provider}
      */
     public Provider getProvider() {
@@ -302,7 +322,7 @@ public abstract class Provider implements Callable<Long> {
 
     /**
      * After convert a single change data to a {@code Row}, insert into the {@code RowSet}.
-     * 
+     *
      * @param row the converted change data
      * @param rowSet the {@code RowSet} to organize the {@code Row}
      * @throws BiremeException Exceptions when add {@code Row} to {@code RowSet}

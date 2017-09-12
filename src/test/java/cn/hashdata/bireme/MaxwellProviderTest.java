@@ -16,7 +16,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -25,30 +24,21 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.powermock.api.mockito.PowerMockito;
 
 import com.codahale.metrics.Meter;
-import com.google.gson.Gson;
 
 import cn.hashdata.bireme.ChangeSet;
 import cn.hashdata.bireme.Config;
 import cn.hashdata.bireme.Context;
-import cn.hashdata.bireme.BiremeException;
-import cn.hashdata.bireme.Row;
 import cn.hashdata.bireme.Table;
 import cn.hashdata.bireme.Provider.Transformer;
-import cn.hashdata.bireme.Row.RowType;
-import cn.hashdata.bireme.provider.MaxwellChangeProvider;
-import cn.hashdata.bireme.provider.MaxwellChangeProvider.MaxwellChangeTransformer;
-import cn.hashdata.bireme.provider.MaxwellChangeProvider.MaxwellChangeTransformer.MaxwellRecord;
+import cn.hashdata.bireme.provider.KafkaProvider.KafkaProviderConfig;
+import cn.hashdata.bireme.provider.MaxwellProvider;
 
-import java.lang.reflect.Field;
-import java.sql.Types;
-
-public class MaxwellChangeProviderTest {
+public class MaxwellProviderTest {
   @Mock Meter mockProviderMeter;
   @Mock KafkaConsumer<String, String> mockConsumer;
   @Mock Logger logger;
-  @InjectMocks MaxwellChangeProvider provider;
+  @InjectMocks Provider provider;
 
-  @Mock(name = "tablesInfo") HashMap<String, Table> mockTableInfo;
   @InjectMocks Context cxt;
 
   @Mock ChangeSet mockChangeSet;
@@ -57,27 +47,26 @@ public class MaxwellChangeProviderTest {
   @Rule public final ExpectedException exception = ExpectedException.none();
 
   Config conf;
-  Gson gson;
+  KafkaProviderConfig kafkaConf;
   Table table;
 
   @Before
   public void setup() throws Exception {
     conf = TestUtil.generateConfig();
-    TestUtil.addMaxellDataSource(conf, 1);
+    TestUtil.addKafkaDataSource(conf, 1);
+    kafkaConf = conf.maxwellConf.get(0);
+
     cxt = new Context(conf, true);
-    gson = new Gson();
-    provider = new MaxwellChangeProvider(cxt, conf.maxwellConf.get(0));
+    provider = new MaxwellProvider(cxt, kafkaConf, true);
     MockitoAnnotations.initMocks(this);
   }
 
-  @SuppressWarnings("unchecked")
   @Test
   public void testChangeSetQueueBlocking() throws Exception {
     PowerMockito.when(mockConsumer.poll(Mockito.anyLong())).thenReturn(mockRecords);
     PowerMockito.when(mockRecords.isEmpty()).thenReturn(false);
-    Field f = provider.getClass().getDeclaredField("changeSetOut");
-    f.setAccessible(true);
-    LinkedBlockingQueue<ChangeSet> queue = (LinkedBlockingQueue<ChangeSet>) f.get(provider);
+
+    LinkedBlockingQueue<ChangeSet> queue = cxt.changeSetQueue;
 
     assertTrue(queue.remainingCapacity() == conf.changeset_queue_size);
 
@@ -97,30 +86,6 @@ public class MaxwellChangeProviderTest {
     executor.shutdown();
   }
 
-  @Test
-  public void testTransformRecord() throws BiremeException, Exception {
-    MaxwellChangeTransformer transformer =
-        (MaxwellChangeTransformer) provider.borrowTransformer(mockChangeSet);
-    String change =
-        "{\"database\":\"demo\",\"table\":\"test\",\"type\":\"update\",\"ts\":1503728889,\"xid\":5024,\"commit\":true,\"data\":{\"column0\":1, \"column1\":\"bireme\"},\"old\":{\"column0\":2}}";
-    MaxwellRecord record = gson.fromJson(change, MaxwellRecord.class);
-
-    ArrayList<Integer> types = new ArrayList<Integer>();
-    types.add(Types.INTEGER);
-    types.add(Types.VARCHAR);
-    ArrayList<Integer> keyIndexs = new ArrayList<Integer>();
-    keyIndexs.add(0);
-    table = TestUtil.generateTableInfo(types, keyIndexs);
-
-    PowerMockito.when(mockTableInfo.get(Mockito.any())).thenReturn(table);
-
-    Row row = transformer.convertRecord(record, RowType.UPDATE);
-    assertTrue(row.keys.equals("1\n"));
-    assertTrue(row.oldKeys.equals("2\n"));
-    assertTrue(row.tuple.equals("1|\"bireme\"\n"));
-  }
-
-  @SuppressWarnings("unchecked")
   @Test
   public void testTransformerBorrowAndReturn() throws Exception {
     Transformer t;
@@ -147,9 +112,7 @@ public class MaxwellChangeProviderTest {
       }
     }
 
-    Field f = provider.getClass().getDeclaredField("idleTransformer");
-    f.setAccessible(true);
-    LinkedBlockingQueue<Transformer> queue = (LinkedBlockingQueue<Transformer>) f.get(provider);
+    LinkedBlockingQueue<Transformer> queue = provider.idleTransformer;
 
     assertTrue(queue.size() == idle);
     assertTrue(array.size() == active);

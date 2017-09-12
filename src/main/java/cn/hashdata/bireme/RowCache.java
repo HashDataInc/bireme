@@ -6,9 +6,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 /**
  * An in-memory cache for {@code Row}. We use cache to merge and load operations in batch.
  * {@code Rows} are separated by its destination table. In each cache, {@code Rows} are ordered.
@@ -149,8 +146,6 @@ public class RowCache {
     protected ArrayList<CommitCallback> callbacks;
     protected Context cxt;
 
-    private Logger logger = LogManager.getLogger("Bireme." + RowBatchMerger.class);
-
     /**
      * Create a RowBatchMerger.
      *
@@ -203,9 +198,6 @@ public class RowCache {
 
         cxt.idleRows.returnObject(row);
       }
-
-      logger.trace("Merge batch {} (size: {}) to task {} (including {} inserts and {} delete.)",
-          rows.hashCode(), rows.size(), task.hashCode(), task.insert.size(), task.delete.size());
 
       cxt.idleRowArrays.returnObject(rows);
 

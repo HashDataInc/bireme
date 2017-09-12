@@ -7,16 +7,19 @@ import java.util.HashMap;
 import cn.hashdata.bireme.Config;
 import cn.hashdata.bireme.Table;
 import cn.hashdata.bireme.Config.ConnectionConfig;
-import cn.hashdata.bireme.provider.KafkaProviderConfig;
+import cn.hashdata.bireme.provider.KafkaProvider.KafkaProviderConfig;
+import cn.hashdata.bireme.provider.ProviderConfig.SourceType;
 
 public class TestUtil {
-  public static void addMaxellDataSource(Config conf, int tableCount) {
+  public static void addKafkaDataSource(Config conf, int tableCount) {
     String name = "datasource_" + conf.dataSource.size();
     KafkaProviderConfig maxwellConfig = new KafkaProviderConfig();
     maxwellConfig.name = name;
+    maxwellConfig.type = SourceType.MAXWELL;
     maxwellConfig.server = "127.0.0.1:9092";
     maxwellConfig.topic = name;
     maxwellConfig.tableMap = new HashMap<String, String>();
+
     for (int count = 0; count < tableCount; count++) {
       maxwellConfig.tableMap.put(name + "."
               + "demo.table" + count,

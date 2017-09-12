@@ -13,7 +13,8 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import cn.hashdata.bireme.provider.KafkaProviderConfig;
+import cn.hashdata.bireme.provider.KafkaProvider.KafkaProviderConfig;
+import cn.hashdata.bireme.provider.ProviderConfig.SourceType;
 
 /**
  * Configurations about bireme.
@@ -164,17 +165,19 @@ public class Config {
       String name = dataSource.get(i);
       String type = config.getString(name + ".type");
 
-      dataSourceType.add(config.getString(dataSource.get(i) + ".type"));
+      dataSourceType.add(type);
 
       switch (type) {
         case "maxwell":
           KafkaProviderConfig conf = fetchMaxwellConfig(name);
+          conf.type = SourceType.MAXWELL;
           conf.tableMap = fetchTableMap(conf.name);
           maxwellConf.add(conf);
           break;
 
         case "debezium":
           KafkaProviderConfig dconf = fetchDebeziumConfig(name);
+          dconf.type = SourceType.DEBEZIUM;
           dconf.tableMap = fetchTableMap(dconf.name);
           debeziumConf.add(dconf);
           break;

@@ -21,7 +21,7 @@ public class ContextTest {
   @Before
   public void setup() throws Exception {
     conf = TestUtil.generateConfig();
-    TestUtil.addMaxellDataSource(conf, 2);
+    TestUtil.addKafkaDataSource(conf, 2);
     cxt = new Context(conf, true);
   }
 

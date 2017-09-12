@@ -55,9 +55,9 @@ public class ChangeLoader implements Callable<Long> {
   private String mappedTable;
   protected LinkedBlockingQueue<Triple<String, CommitCallback, String>> positionUpdateQueue;
 
-  private Timer copyBeforeDeleteTimer;
+  private Timer copyForDeleteTimer;
   private Timer deleteTimer;
-  private Timer copyTimer;
+  private Timer copyForInsertTimer;
   private Timer.Context timerCTX;
 
   /**
@@ -84,10 +84,11 @@ public class ChangeLoader implements Callable<Long> {
           }
         });
 
-    copyBeforeDeleteTimer =
-        cxt.metrics.timer(MetricRegistry.name(ChangeLoader.class, mappedTable, "copyBeforeDelete"));
-    deleteTimer = cxt.metrics.timer(MetricRegistry.name(ChangeLoader.class, mappedTable, "delete"));
-    copyTimer = cxt.metrics.timer(MetricRegistry.name(ChangeLoader.class, mappedTable, "copy"));
+    copyForDeleteTimer =
+        cxt.metrics.timer(MetricRegistry.name(ChangeLoader.class, mappedTable, "CopyForDelete"));
+    deleteTimer = cxt.metrics.timer(MetricRegistry.name(ChangeLoader.class, mappedTable, "Delete"));
+    copyForInsertTimer =
+        cxt.metrics.timer(MetricRegistry.name(ChangeLoader.class, mappedTable, "CopyForInsert"));
   }
 
   /**
@@ -115,9 +116,7 @@ public class ChangeLoader implements Callable<Long> {
         }
 
         try {
-          logger.trace("Start execute task {}. ", currentTask.hashCode());
           executeTask();
-          logger.trace("Task complete {}.", currentTask.hashCode());
         } catch (Exception e) {
           try {
             conn.rollback();
@@ -138,7 +137,7 @@ public class ChangeLoader implements Callable<Long> {
       }
 
       logger.error(
-          "Loader exit on error, corresponding table {}. message {}", mappedTable, e.getMessage());
+          "Loader exit on error, corresponding table {}. Message {}", mappedTable, e.getMessage());
       return 0L;
     } finally {
       threadPool.shutdown();
@@ -275,7 +274,7 @@ public class ChangeLoader implements Callable<Long> {
     ArrayList<String> keyNames = table.keyNames;
     String temporaryTableName = getTemporaryTableName();
 
-    timerCTX = copyBeforeDeleteTimer.time();
+    timerCTX = copyForDeleteTimer.time();
     copyWorker(temporaryTableName, keyNames, delete);
     timerCTX.stop();
 
@@ -288,6 +287,7 @@ public class ChangeLoader implements Callable<Long> {
 
     if (timerCTX.stop() > DELETE_TIMEOUT_NS) {
       String plan = deletePlan(mappedTable, temporaryTableName, keyNames);
+
       logger.warn("Delete time exceed 10 seconds, delete plan:\n {}", plan);
     }
 
@@ -297,7 +297,7 @@ public class ChangeLoader implements Callable<Long> {
   private void executeInsert(Set<String> insertSet) throws BiremeException, InterruptedException {
     ArrayList<String> columnList = table.columnName;
 
-    timerCTX = copyTimer.time();
+    timerCTX = copyForInsertTimer.time();
     try {
       copyWorker(mappedTable, columnList, insertSet);
     } catch (BiremeException e) {

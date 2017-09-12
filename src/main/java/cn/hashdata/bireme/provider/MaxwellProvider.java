@@ -27,17 +27,22 @@ import cn.hashdata.bireme.Row.RowType;
  * @author yuze
  *
  */
-public class MaxwellChangeProvider extends KafkaProvider {
+public class MaxwellProvider extends KafkaProvider {
   final public static String PROVIDER_TYPE = "Maxwell";
+
+  public MaxwellProvider(Context cxt, KafkaProviderConfig config) {
+    this(cxt, config, false);
+  }
 
   /**
    * Create a new {@code MaxwellChangeProvider}.
    *
    * @param cxt bireme context
    * @param config {@code MaxwellConfig}.
+   * @param test for unitest
    */
-  public MaxwellChangeProvider(Context cxt, KafkaProviderConfig config) {
-    super(cxt, config);
+  public MaxwellProvider(Context cxt, KafkaProviderConfig config, boolean test) {
+    super(cxt, config, test);
   }
 
   @Override
@@ -58,11 +63,6 @@ public class MaxwellChangeProvider extends KafkaProvider {
   @Override
   public Transformer createTransformer() {
     return new MaxwellChangeTransformer();
-  }
-
-  @Override
-  public String getProviderType() {
-    return PROVIDER_TYPE + ABSTRACT_PROVIDER_TYPE;
   }
 
   /**
@@ -160,7 +160,7 @@ public class MaxwellChangeProvider extends KafkaProvider {
     private boolean filter(MaxwellRecord record) {
       String fullTableName = record.dataSource + "." + record.database + "." + record.table;
 
-      MaxwellChangeProvider p = (MaxwellChangeProvider) changeSet.provider;
+      MaxwellProvider p = (MaxwellProvider) changeSet.provider;
       if (!p.providerConfig.tableMap.containsKey(fullTableName)) {
         // Do not sync this table
         return true;

@@ -129,7 +129,7 @@ public class Context {
 
     if (!test) {
       createThreadPool();
-      registerMetric();
+      registerGauge();
     }
   }
 
@@ -172,7 +172,7 @@ public class Context {
     loadercs = new ExecutorCompletionService<Long>(loaderThreadPool);
   }
 
-  private void registerMetric() {
+  private void registerGauge() {
     metrics.register(MetricRegistry.name(Context.class, "ChangeSetQueue"), new Gauge<Integer>() {
       @Override
       public Integer getValue() {
@@ -191,34 +191,6 @@ public class Context {
             }
           });
     }
-
-    metrics.register(
-        MetricRegistry.name(GenericObjectPool.class, "for ChangeSet"), new Gauge<Integer>() {
-          @Override
-          public Integer getValue() {
-            return idleChangeSets.getNumActive() + idleChangeSets.getNumIdle();
-          }
-        });
-    metrics.register(
-        MetricRegistry.name(GenericObjectPool.class, "for RowSet"), new Gauge<Integer>() {
-          @Override
-          public Integer getValue() {
-            return idleRowSets.getNumActive() + idleRowSets.getNumIdle();
-          }
-        });
-    metrics.register(MetricRegistry.name(GenericObjectPool.class, "for Row"), new Gauge<Integer>() {
-      @Override
-      public Integer getValue() {
-        return idleRows.getNumActive() + idleRows.getNumIdle();
-      }
-    });
-    metrics.register(
-        MetricRegistry.name(GenericObjectPool.class, "for RowArray"), new Gauge<Integer>() {
-          @Override
-          public Integer getValue() {
-            return idleRowArrays.getNumActive() + idleRowArrays.getNumIdle();
-          }
-        });
   }
 
   public void startWatchDog(DaemonController controller) {

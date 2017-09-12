@@ -38,7 +38,7 @@ import com.codahale.metrics.JmxReporter;
 
 import cn.hashdata.bireme.Config.ConnectionConfig;
 import cn.hashdata.bireme.provider.DebeziumProvider;
-import cn.hashdata.bireme.provider.MaxwellChangeProvider;
+import cn.hashdata.bireme.provider.MaxwellProvider;
 
 /**
  * {@code Bireme} is an incremental synchronization tool. It could sync update in MySQL to GreenPlum
@@ -285,7 +285,7 @@ public class Bireme implements Daemon {
 
   protected void createMaxwellChangeProvider() throws BiremeException {
     for (int i = 0, len = cxt.conf.maxwellConf.size(); i < len; i++) {
-      Callable<Long> maxwellProvider = new MaxwellChangeProvider(cxt, cxt.conf.maxwellConf.get(i));
+      Callable<Long> maxwellProvider = new MaxwellProvider(cxt, cxt.conf.maxwellConf.get(i));
       cxt.cs.submit(maxwellProvider);
     }
   }

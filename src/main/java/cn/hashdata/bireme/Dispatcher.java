@@ -42,6 +42,7 @@ public class Dispatcher implements Callable<Long> {
 
   /**
    * Create a new {@code Dispatcher}.
+   *
    * @param cxt bireme context.
    */
   public Dispatcher(Context cxt) {
@@ -125,10 +126,6 @@ public class Dispatcher implements Callable<Long> {
   private void insertRowSet(RowSet rowSet) throws InterruptedException, BiremeException {
     HashMap<String, ArrayList<Row>> bucket = rowSet.rowBucket;
     ConcurrentHashMap<String, RowCache> tableCache = cxt.tableRowCache;
-
-    if (bucket.size() != 0) {
-      logger.trace("Insert RowSet {} to cache.", rowSet.hashCode());
-    }
 
     try {
       for (Entry<String, ArrayList<Row>> entry : bucket.entrySet()) {

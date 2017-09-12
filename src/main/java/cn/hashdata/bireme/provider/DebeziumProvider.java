@@ -32,7 +32,11 @@ public class DebeziumProvider extends KafkaProvider {
   final public static String PROVIDER_TYPE = "Debezium";
 
   public DebeziumProvider(Context cxt, KafkaProviderConfig config) {
-    super(cxt, config);
+    this(cxt, config, false);
+  }
+
+  public DebeziumProvider(Context cxt, KafkaProviderConfig config, boolean test) {
+    super(cxt, config, test);
   }
 
   @Override
@@ -58,11 +62,6 @@ public class DebeziumProvider extends KafkaProvider {
   @Override
   public Transformer createTransformer() {
     return new DebeziumTransformer();
-  }
-
-  @Override
-  public String getProviderType() {
-    return PROVIDER_TYPE + ABSTRACT_PROVIDER_TYPE;
   }
 
   public class DebeziumTransformer extends KafkaTransformer {
@@ -214,15 +213,15 @@ public class DebeziumProvider extends KafkaProvider {
       String oneByte;
       String result;
       byte[] decoded = Base64.decodeBase64(data);
-      
+
       ArrayUtils.reverse(decoded);
-      
+
       for (byte b : decoded) {
         oneByte = String.format("%8s", Integer.toBinaryString(b & 0xFF)).replace(' ', '0');
         sb.append(oneByte);
       }
       result = sb.toString();
-      
+
       return result.substring(result.length() - precision);
     }
   }

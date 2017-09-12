@@ -49,7 +49,7 @@ public class TaskGenerator implements Callable<Long> {
   /**
    * Constantly check the {@code RowCache} and construct {@code RowBatchMerger} to work.
    */
-  public Long call() throws BiremeException, InterruptedException, Exception {
+  public Long call() throws BiremeException, InterruptedException {
     Thread.currentThread().setName("TaskGenerator");
 
     logger.info("TaskGenerator Start.");
@@ -76,7 +76,7 @@ public class TaskGenerator implements Callable<Long> {
     return 0L;
   }
 
-  private void generateMergeTask() throws InterruptedException, Exception {
+  private void generateMergeTask() throws InterruptedException, BiremeException {
     Future<LoadTask> task;
 
     for (Entry<String, RowCache> entry : tableCache.entrySet()) {
@@ -95,8 +95,6 @@ public class TaskGenerator implements Callable<Long> {
       }
 
       if (batch != null) {
-        logger.trace("Create batch {}.", batch.hashCode());
-
         task = cs.submit(batch);
         boolean success;
 

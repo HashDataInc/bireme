@@ -24,7 +24,7 @@ import cn.hashdata.bireme.RowSet;
 
 /**
  * {@code KafkaProvider} is able to poll change data from Kafka.
- * 
+ *
  * @author yuze
  *
  */
@@ -32,8 +32,9 @@ public abstract class KafkaProvider extends Provider {
   protected static final Long TIMEOUT_MS = 1000L;
   public static final String ABSTRACT_PROVIDER_TYPE = "Kafka";
 
-  public enum SourceType {
-    MAXWELL, DEBEZIUM
+  public static class KafkaProviderConfig extends ProviderConfig {
+    public String topic;
+    public String server;
   }
 
   public KafkaProviderConfig providerConfig;
@@ -42,22 +43,19 @@ public abstract class KafkaProvider extends Provider {
 
   /**
    * Create a new {@code kafkaProvider}.
-   * 
+   *
    * @param cxt the {@code Context}
    * @param providerConfig configuration for the {@code KafkaProvider}
    */
-  public KafkaProvider(Context cxt, KafkaProviderConfig providerConfig) {
-    super(cxt);
+  public KafkaProvider(Context cxt, KafkaProviderConfig providerConfig, boolean test) {
+    super(cxt, providerConfig);
     this.providerConfig = providerConfig;
     this.commitCallbacks = new LinkedBlockingQueue<KafkaCommitCallback>();
 
-    consumer = new KafkaConsumer<String, String>(kafkaProps());
-    consumer.assign(createTopicPartitions());
-  }
-
-  @Override
-  public String getProviderName() {
-    return providerConfig.name;
+    if (!test) {
+      consumer = new KafkaConsumer<String, String>(kafkaProps());
+      consumer.assign(createTopicPartitions());
+    }
   }
 
   private void checkAndCommit() {
@@ -108,7 +106,7 @@ public abstract class KafkaProvider extends Provider {
 
   /**
    * Create a list of {@code TopicPartition} to subscribe according configuration.
-   * 
+   *
    * @return an ArrayList of {@code TopicPartition}
    */
   protected abstract ArrayList<TopicPartition> createTopicPartitions();
@@ -120,6 +118,10 @@ public abstract class KafkaProvider extends Provider {
    */
   @Override
   public Long call() throws BiremeException, InterruptedException {
+    Thread.currentThread().setName("Provider " + getProviderName());
+
+    logger.info("Provider {} Start.", getProviderName());
+
     ConsumerRecords<String, String> records = null;
     ChangeSet changeSet = null;
     boolean success = false;
@@ -144,11 +146,17 @@ public abstract class KafkaProvider extends Provider {
 
         changeSet = packRecords(records, callback);
 
+        recordMeter.mark(records.count());
+
         do {
           success = changeSetOut.offer(changeSet, TIMEOUT_MS, TimeUnit.MILLISECONDS);
           checkAndCommit();
         } while (!success && !cxt.stop);
       }
+    } catch (BiremeException | InterruptedException e) {
+      logger.error("Provider {} exit on error. Message {}", getProviderName(), e.getMessage());
+
+      throw e;
     } finally {
       try {
         consumer.close();
@@ -156,12 +164,13 @@ public abstract class KafkaProvider extends Provider {
       }
     }
 
+    logger.info("Provider {} exit.", getProviderName());
     return 0L;
   }
 
   /**
    * Loop through the {@code ChangeSet} and transform each change data into a {@code Row}.
-   * 
+   *
    * @author yuze
    *
    */
@@ -173,7 +182,8 @@ public abstract class KafkaProvider extends Provider {
       HashMap<TopicPartition, Long> offsets = ((KafkaCommitCallback) callback).partitionOffset;
       Row row = null;
 
-      for (ConsumerRecord<String, String> change : (ConsumerRecords<String, String>) changeSet.changes) {
+      for (ConsumerRecord<String, String> change :
+          (ConsumerRecords<String, String>) changeSet.changes) {
         try {
           row = cxt.idleRows.borrowObject();
         } catch (Exception e) {
@@ -196,7 +206,7 @@ public abstract class KafkaProvider extends Provider {
 
     /**
      * Transform the change data into a {@code Row}.
-     * 
+     *
      * @param change the change data
      * @param row an empty {@code Row} to store the result.
      * @return {@code true} if transform the change data successfully, {@code false} it the change
@@ -229,9 +239,8 @@ public abstract class KafkaProvider extends Provider {
     public void commit() {
       HashMap<TopicPartition, OffsetAndMetadata> offsets =
           new HashMap<TopicPartition, OffsetAndMetadata>();
-      partitionOffset.forEach((key, value) -> {
-        offsets.put(key, new OffsetAndMetadata(value + 1));
-      });
+      partitionOffset.forEach(
+          (key, value) -> { offsets.put(key, new OffsetAndMetadata(value + 1)); });
 
       consumer.commitSync(offsets);
       committed.set(true);
