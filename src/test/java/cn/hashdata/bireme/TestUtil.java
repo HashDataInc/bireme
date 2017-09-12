@@ -42,7 +42,6 @@ public class TestUtil {
     connectionConfig.user = "postgres";
     connectionConfig.passwd = "postgres";
     conf.target = connectionConfig;
-    conf.bookkeeping = connectionConfig;
     return conf;
   }
 

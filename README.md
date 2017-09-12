@@ -4,7 +4,7 @@
 
 [Getting Started Guide](docs/bireme_guide.md)
 
-Bireme is an incremental synchronization tool for the Greenplum / HashData data warehouse. Currently supports MySQL data sources.
+Bireme is an incremental synchronization tool for the Greenplum / HashData data warehouse. Currently supports MySQL, PostgreSQL and MongoDB data sources.
 
 [Greenplum](http://greenplum.org/) is an advanced, fully functional open source data warehouse that provides powerful and fast analysis of the amount of petabyte data. It is uniquely oriented for large data analysis and is supported by the world's most advanced cost-based query optimizer. It can provide high query performance over large amounts of data.
 
@@ -16,7 +16,6 @@ Features and Constraints:
 
 * Using small batch loading to enhance the performance of data synchronization, the default load delay time of 10 seconds.
 * All tables must have primary keys in the target database
-* Currently supports Maxwell data sources.
 
 ## 1.1 Data Flow
 
@@ -33,7 +32,6 @@ Maxwell + Kafka is a data source type that bireme currently supports, the struct
 ![maxwell](docs/maxwell.png)
 
 * [Maxwell](http://maxwells-daemon.io/) is an application that reads MySQL binlogs and writes row updates to Kafka as JSON.
-* [Kafka](http://kafka.apache.org/) is a distributed streaming platform. It lets you publish and subscribe to streams of records.
 
 ### 1.2.2 Debezium + Kafka
 
@@ -87,11 +85,6 @@ The configuration files consist of two parts:
 
 |Parameters|Description|Default|
 |:---:|:---:|:---:|
-|bookkeeping.url|The address of state database used to record the synchronization status|The same as target.url|
-|bookkeeping.user|The user name used to connect to the state database|The same as target.user|
-|bookkeeping.passwd|The password used to connect to the state database|The same as target.passwd|
-|bookkeep.interval|Interval between update of state database in milliseconds|1000|
-|bookkeep.table_name|table used to record status|bookkeeping|
 |metrics.reporter|Bireme specifies two monitoring modes, consolo or jmx. If you do not need to monitor, you can specify this as none|console|
 |metrics.reporter.console.interval|Time interval between metrics output in seconds. It is valic as long as metrics.reporter is console.|10|
 |loader.conn_pool.size|Number of connections to target database, less or equal to the number of Change Loaders|10|
@@ -114,5 +107,5 @@ In the configuration file for each data source, specify the table which the data
 ## 1.5 Reference
 
 [Maxwell Reference](http://maxwells-daemon.io/)  
-[Debezium Reference](http://debezium.io/) 
+[Debezium Reference](http://debezium.io/)  
 [Kafka Reference](http://kafka.apache.org/)

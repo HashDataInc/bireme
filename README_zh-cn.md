@@ -2,7 +2,7 @@
 
 [入门指南](docs/bireme_guide_zh-cn.md)
 
-Bireme 是一个 Greenplum / HashData 数据仓库的**增量**同步工具。目前支持 MySQL 数据源。  
+Bireme 是一个 Greenplum / HashData 数据仓库的**增量**同步工具。目前支持 MySQL、PostgreSQL 和 MongoDB 数据源。  
 
 [Greenplum](http://greenplum.org/) 是一个高级，功能齐全的开源数据仓库，为PB级数据量提供强大而快速的分析。它独特地面向大数据分析，由世界上最先进的基于成本的查询优化器提供支持，可在大数据量上提供高分析查询性能。
 
@@ -14,7 +14,6 @@ Bireme 特性与约束：
 
 * 采用小批量加载的方式提升数据同步的性能，默认加载延迟时间为10秒钟。
 * 所有表在目标数据库中必须有主键
-* 目前支持 Maxwell 数据源。
 
 ## 1.1 数据流  
 
@@ -30,8 +29,7 @@ Maxwell + Kafka 是 bireme 目前支持的一种数据源类型，架构如下�
 
 ![maxwell](docs/maxwell.png)
   
-* [Maxwell](http://maxwells-daemon.io/) 是一个 MySQL binlog 的读取工具，它可以实时读取 MySQL 的 binlog，并生成 JSON 格式的消息，作为生产者发送给 Kafka。  
-* [Kafka](http://kafka.apache.org/) 是一个分布式数据流平台，它可以接收、存储生产者发布的消息，并供给消费者使用。  
+* [Maxwell](http://maxwells-daemon.io/) 是一个 MySQL binlog 的读取工具，它可以实时读取 MySQL 的 binlog，并生成 JSON 格式的消息，作为生产者发送给 Kafka。    
 
 ### 1.2.2 Debezium + Kafka
 
@@ -39,7 +37,7 @@ Debeziuk + Kafka 是 bireme 支持的另外一种数据源类型，架构如下�
 
 ![debezium](docs/debezium.png)
 
-* [Debezium](http://debezium.io/) Debezium是一个CDC工具，可以将数据库的增删改转换为事件流，并把这些修改发送给 Kafka
+* [Debezium](http://debezium.io/) 是一个CDC工具，可以将数据库的增删改转换为事件流，并把这些修改发送给 Kafka
 
 ## 1.3 Bireme工作原理
 
@@ -86,11 +84,6 @@ Bireme 从数据源读取数据 (Record)，将其转化为内部格式 (Row) 并
 
 |参数|描述|默认值|
 |:---:|:---:|:---:|
-|bookkeeping.url|用于记录同步状态的状态数据库地址|同 target.url|
-|bookkeeping.user|状态数据库的用户名|同 target.user|
-|bookkeeping.passwd|状态数据库的密码|同 target.passwd|
-|bookkeep.interval|更新状态到数据库的时间间隔，单位毫秒|1000|
-|bookkeep.table_name|用于记录状态的表名|bookkeeping|
 |metrics.reporter|Bireme指定了两种监控模式，一种是 console ，另外一种是 jmx ，如果不需要监控，可以指定为 none|console|
 |metrics.reporter.console.interval|输出 metrics 的时间间隔，当 metrics.reporter 为 console 有效，单位秒|10|
 |loader.conn_pool.size|目标数据库的连接个数，小于等于 Change Loader 的数量|10|
@@ -112,6 +105,6 @@ Bireme 从数据源读取数据 (Record)，将其转化为内部格式 (Row) 并
 
 ## 1.5 参考
 
-[Maxwell 参考](http://maxwells-daemon.io/)
+[Maxwell 参考](http://maxwells-daemon.io/)  
 [Debezium 参考](http://debezium.io/)  
 [Kafka 参考](http://kafka.apache.org/)

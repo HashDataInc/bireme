@@ -3,18 +3,13 @@ package cn.hashdata.bireme;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Types;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -29,7 +24,6 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.daemon.Daemon;
 import org.apache.commons.daemon.DaemonContext;
 import org.apache.commons.daemon.DaemonInitException;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -155,134 +149,6 @@ public class Bireme implements Daemon {
     logger.info("Finishing establishing {} connections for loaders.", cxt.conf.loader_conn_size);
   }
 
-  protected void initBookkeepPosition() throws BiremeException {
-    logger.info("Start initializing bookkeeping table.");
-
-    Connection conn = null;
-
-    try {
-      conn = jdbcConn(cxt.conf.bookkeeping);
-      conn.setAutoCommit(false);
-
-      String sql = "DROP TABLE IF EXISTS " + cxt.conf.bookkeeping_table;
-      PreparedStatement ps = conn.prepareStatement(sql);
-      ps.executeUpdate();
-
-      sql = "CREATE TABLE " + cxt.conf.bookkeeping_table + " ( ORIGIN_TABLE VARCHAR(30), "
-          + "POSITION VARCHAR(30), TYPE VARCHAR(30), STATE VARCHAR(10) )";
-      ps = conn.prepareStatement(sql);
-      ps.executeUpdate();
-
-      sql = "INSERT INTO " + cxt.conf.bookkeeping_table + " (ORIGIN_TABLE, STATE) VALUES(?,?);";
-      ps = conn.prepareStatement(sql);
-
-      for (String originTable : cxt.tableMap.keySet()) {
-        ps.setString(1, originTable);
-        ps.setString(2, "Normal");
-        ps.addBatch();
-      }
-
-      ps.executeBatch();
-      conn.commit();
-    } catch (Exception e) {
-      logger.fatal("Could not initialize bookkeeping table. Message: {}.", e.getMessage());
-
-      try {
-        conn.rollback();
-      } catch (SQLException ignore) {
-      }
-
-      throw new BiremeException(e);
-    } finally {
-      try {
-        conn.close();
-      } catch (SQLException ignore) {
-      }
-    }
-
-    logger.info("Finish initializing bookkeeping table.");
-  }
-
-  protected void restoreBookkeepPosition() throws BiremeException {
-    logger.info("Start restoring position from bookkeeping table.");
-
-    Connection conn = null;
-
-    try {
-      conn = jdbcConn(cxt.conf.bookkeeping);
-      conn.setAutoCommit(false);
-
-      String sql = "SELECT ORIGIN_TABLE, POSITION, TYPE, STATE FROM " + cxt.conf.bookkeeping_table;
-      PreparedStatement ps = conn.prepareStatement(sql);
-      ResultSet rs = ps.executeQuery();
-
-      ConcurrentHashMap<String, Pair<CommitCallback, String>> bookKeep = cxt.bookkeeping;
-      String type;
-      CommitCallback position;
-
-      while (rs.next()) {
-        type = rs.getString(3);
-
-        if (!rs.wasNull()) {
-          if (!cxt.tableMap.containsKey(rs.getString(1))) {
-            continue;
-          }
-
-          switch (type) {
-            case "Maxwell":
-              position = null; // new MaxwellChangePosition(rs.getString(2));
-              bookKeep.put(rs.getString(1), Pair.of(position, "Normal"));
-              break;
-          }
-        }
-      }
-
-      sql = "DELETE FROM " + cxt.conf.bookkeeping_table;
-      ps = conn.prepareStatement(sql);
-      ps.executeUpdate();
-
-      sql = "INSERT INTO " + cxt.conf.bookkeeping_table
-          + " (ORIGIN_TABLE, POSITION, TYPE, STATE) VALUES(?,?,?,?)";
-      ps = conn.prepareStatement(sql);
-
-      for (String table : cxt.tableMap.keySet()) {
-        ps.setString(1, table);
-        ps.setString(4, "Normal");
-
-        if (cxt.bookkeeping.containsKey(table)) {
-          CommitCallback p = cxt.bookkeeping.get(table).getLeft();
-          ps.setString(2, p.toStirng());
-          ps.setString(3, p.getType());
-        } else {
-          ps.setNull(2, Types.VARCHAR);
-          ps.setNull(3, Types.VARCHAR);
-        }
-
-        ps.addBatch();
-      }
-      ps.executeBatch();
-
-      conn.commit();
-    } catch (SQLException e) {
-      logger.fatal("Could not restore bookkeeping table. Message: {}.", e.getMessage());
-
-      try {
-        conn.rollback();
-      } catch (SQLException ignore) {
-      }
-
-      throw new BiremeException(e);
-
-    } finally {
-      try {
-        conn.close();
-      } catch (SQLException ignore) {
-      }
-    }
-
-    logger.info("Finish restoring position from bookkeeping table.");
-  }
-
   protected void createMaxwellChangeProvider() throws BiremeException {
     for (int i = 0, len = cxt.conf.maxwellConf.size(); i < len; i++) {
       Callable<Long> maxwellProvider = new MaxwellProvider(cxt, cxt.conf.maxwellConf.get(i));
@@ -323,11 +189,6 @@ public class Bireme implements Daemon {
     }
   }
 
-  protected void createBookKeeper() {
-    Callable<Long> bookKeeper = new BookKeeper(cxt);
-    cxt.cs.submit(bookKeeper);
-  }
-
   /**
    * Start metrics reporter.
    *
@@ -365,20 +226,6 @@ public class Bireme implements Daemon {
     getTableInfo();
     initLoaderConnections();
 
-    Connection conn = null;
-    conn = jdbcConn(cxt.conf.bookkeeping);
-
-    DatabaseMetaData dbm = conn.getMetaData();
-    ResultSet tables =
-        dbm.getTables(null, null, cxt.conf.bookkeeping_table, new String[] {"TABLE"});
-
-    if (tables.next()) {
-      restoreBookkeepPosition();
-    } else {
-      initBookkeepPosition();
-    }
-
-    // createBookKeeper();
     createChangeLoaders();
     createTaskGenerator();
     createChangeDispatcher();

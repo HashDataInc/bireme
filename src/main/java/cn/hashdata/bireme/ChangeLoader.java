@@ -72,7 +72,6 @@ public class ChangeLoader implements Callable<Long> {
     this.conn = null;
     this.mappedTable = mappedTable;
     this.table = cxt.tablesInfo.get(mappedTable);
-    positionUpdateQueue = cxt.positionUpdateQueue;
     taskIn = new LinkedBlockingQueue<Future<LoadTask>>(conf.loader_task_queue_size);
     threadPool = Executors.newFixedThreadPool(1);
 

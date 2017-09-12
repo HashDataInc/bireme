@@ -16,8 +16,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.daemon.DaemonController;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.commons.lang3.tuple.Triple;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
@@ -52,8 +50,6 @@ public class Context {
   public HashMap<String, ChangeLoader> changeLoaders;
   public LinkedBlockingQueue<Connection> loaderConnections;
   public HashMap<Connection, HashSet<String>> temporaryTables;
-  LinkedBlockingQueue<Triple<String, CommitCallback, String>> positionUpdateQueue;
-  public ConcurrentHashMap<String, Pair<CommitCallback, String>> bookkeeping;
 
   public GenericObjectPool<ChangeSet> idleChangeSets;
   public GenericObjectPool<RowSet> idleRowSets;
@@ -119,9 +115,6 @@ public class Context {
     this.changeLoaders = new HashMap<String, ChangeLoader>();
     this.loaderConnections = new LinkedBlockingQueue<Connection>(conf.loader_conn_size);
     this.temporaryTables = new HashMap<Connection, HashSet<String>>();
-
-    this.positionUpdateQueue = new LinkedBlockingQueue<Triple<String, CommitCallback, String>>();
-    this.bookkeeping = new ConcurrentHashMap<String, Pair<CommitCallback, String>>();
 
     exitLoaders = 0;
 

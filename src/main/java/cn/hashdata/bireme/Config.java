@@ -39,12 +39,9 @@ public class Config {
   public int batch_size;
   public int loader_conn_size;
   public int loader_task_queue_size;
-  public int bookkeeping_interval;
-  public String bookkeeping_table;
   public int report_interval;
 
   public ConnectionConfig target;
-  public ConnectionConfig bookkeeping;
 
   public ArrayList<String> dataSource;
   public ArrayList<String> dataSourceType;
@@ -98,9 +95,6 @@ public class Config {
     loader_conn_size = config.getInt("loader.conn_pool.size", 10);
     loader_task_queue_size = config.getInt("loader.task_queue.size", 2);
 
-    bookkeeping_interval = config.getInt("bookkeeping.interval", 10000);
-    bookkeeping_table = config.getString("bookkeeping.table_name", "bookkeeping");
-
     dataSource = new ArrayList<String>();
     dataSourceType = new ArrayList<String>();
     tableMap = new HashMap<String, String>();
@@ -116,16 +110,12 @@ public class Config {
       throw new BiremeException(message);
     }
 
-    bookkeeping = getConnConfig("bookkeeping");
-    if (bookkeeping.jdbcUrl == null) {
-      bookkeeping = target;
-    }
   }
 
   /**
    * Get the connection configuration to database.
    *
-   * @param prefix "target" or "bookkeeping" database
+   * @param prefix "target"  database
    * @return {@code ConnectionConfig} to database.
    */
   protected ConnectionConfig getConnConfig(String prefix) {
@@ -280,15 +270,13 @@ public class Config {
    * Print log about bireme configuration.
    */
   public void logConfig() {
-    String config = "Configures: "
-        + "\n\tchangeSet queue size = " + changeset_queue_size + "\n\ttransform thread pool size = "
-        + transform_pool_size + "\n\ttransform result queue size = " + trans_result_queue_size
-        + "\n\trow cache size = " + row_cache_size + "\n\tmerge thread pool size = "
-        + merge_pool_size + "\n\tmerge interval = " + merge_interval
-        + "\n\tbatch size = " + batch_size + "\n\tloader conn size = " + loader_conn_size
-        + "\n\tloader task queue size = " + loader_task_queue_size + "\n\tbookkeeping interval = "
-        + bookkeeping_interval + "\n\tbookkeeping table = " + bookkeeping_table
-        + "\n\treport interval = " + report_interval;
+    String config = "Configures: " + "\n\tchangeSet queue size = " + changeset_queue_size
+        + "\n\ttransform thread pool size = " + transform_pool_size
+        + "\n\ttransform result queue size = " + trans_result_queue_size + "\n\trow cache size = "
+        + row_cache_size + "\n\tmerge thread pool size = " + merge_pool_size
+        + "\n\tmerge interval = " + merge_interval + "\n\tbatch size = " + batch_size
+        + "\n\tloader conn size = " + loader_conn_size + "\n\tloader task queue size = "
+        + loader_task_queue_size + "\n\treport interval = " + report_interval;
     logger.info(config);
 
     StringBuilder sb = new StringBuilder();
