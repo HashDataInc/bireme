@@ -1,4 +1,4 @@
-#Getting Started Guide
+# Getting Started Guide
 
 In this section, we will demonstrate how to use bireme to synchronize MySQL with a table named *demo.test* to *public.test* in GreenPlum database. Before the start, users need to deploy MySQL, Kafka and GreenPlum.
 
