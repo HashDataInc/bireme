@@ -16,20 +16,30 @@ Bireme 特性与约束：
 * 所有表在目标数据库中必须有主键
 * 目前支持 Maxwell 数据源。
 
-## 1.1 系统架构  
+## 1.1 数据流  
 
-![architecture](docs/architecture.png)
+![data_flow](docs/data_flow.png)
 
 Bireme 支持多数据源同步工作，可以同时从多个数据源并行读取数据，并将数据同步加载到目标数据库。
 
-## 1.2 Maxwell + Kafka 数据源
+## 1.2 数据源
 
-Maxwell + Kafka 是 bireme目前支持的一种数据源类型，架构如下图：
+### 1.2.1 Maxwell + Kafka
 
-![data_source](docs/data_source.png)
+Maxwell + Kafka 是 bireme 目前支持的一种数据源类型，架构如下图：
+
+![maxwell](docs/maxwell.png)
   
 * [Maxwell](http://maxwells-daemon.io/) 是一个 MySQL binlog 的读取工具，它可以实时读取 MySQL 的 binlog，并生成 JSON 格式的消息，作为生产者发送给 Kafka。  
 * [Kafka](http://kafka.apache.org/) 是一个分布式数据流平台，它可以接收、存储生产者发布的消息，并供给消费者使用。  
+
+### 1.2.2 Debezium + Kafka
+
+Debeziuk + Kafka 是 bireme 支持的另外一种数据源类型，架构如下图：
+
+![debezium](docs/debezium.png)
+
+* [Debezium](http://debezium.io/) Debezium是一个CDC工具，可以将数据库的增删改转换为事件流，并把这些修改发送给 Kafka
 
 ## 1.3 Bireme工作原理
 
@@ -65,6 +75,12 @@ Bireme 从数据源读取数据 (Record)，将其转化为内部格式 (Row) 并
 |\<source_name\>.kafka.server|数据源的 Kafka 地址，格式:  <br>\<ip\>:\<port\>|
 |\<source_name\>.kafka.topic|数据源在 Kafka 中对应的 topic|
 
+**Debezium 数据源参数**
+
+|参数|描述|
+|:---:|:---:|
+|\<source_name\>.kafka.server|数据源的 Kafka 地址，格式:  <br>\<ip\>:\<port\>|
+
 
 **其它参数**
 
@@ -96,5 +112,6 @@ Bireme 从数据源读取数据 (Record)，将其转化为内部格式 (Row) 并
 
 ## 1.5 参考
 
-[Maxwell 参考](http://maxwells-daemon.io/)  
+[Maxwell 参考](http://maxwells-daemon.io/)
+[Debezium 参考](http://debezium.io/)  
 [Kafka 参考](http://kafka.apache.org/)

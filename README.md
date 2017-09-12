@@ -18,22 +18,32 @@ Features and Constraints:
 * All tables must have primary keys in the target database
 * Currently supports Maxwell data sources.
 
-## 1.1 System Architecture
+## 1.1 Data Flow
 
-![architecture](docs/architecture.png)
+![data_flow](docs/data_flow.png)
 
 Bireme supports synchronization work of multiple data sources. It can simultaneously read records from multiple data sources in parallel, and load records to the target database.
 
-## 1.2 Maxwell + Kafka Data Source
+## 1.2 Data Source
+
+### 1.2.1 Maxwell + Kafka 
 
 Maxwell + Kafka is a data source type that bireme currently supports, the structure as follows:
 
-![data_source](docs/data_source.png)
+![maxwell](docs/maxwell.png)
 
 * [Maxwell](http://maxwells-daemon.io/) is an application that reads MySQL binlogs and writes row updates to Kafka as JSON.
 * [Kafka](http://kafka.apache.org/) is a distributed streaming platform. It lets you publish and subscribe to streams of records.
 
-## 1.3 How does dbsyn work
+### 1.2.2 Debezium + Kafka
+
+Debezium + Kafka is another data source type that bireme currently supports, the structure as follows:
+
+![debezium](docs/debezium.png) 
+
+* [Debezium](http://debezium.io/) is a distributed platform that turns your existing databases into event streams, so applications can see and respond immediately to each row-level change in the databases. 
+
+## 1.3 How does bireme work
 
 Bireme reads records from the data source, converts it into an internal format and caches it. When the cached records reaches a certain amount, it is merged into a task, each task contains two collections, *delete*  collection and *insert* collection, and finally updates the records to the target database.
 
@@ -67,6 +77,12 @@ The configuration files consist of two parts:
 |\<source_name\>.kafka.server|Kafka address. Format:<br>\<ip\>:\<port\>|
 |\<source_name\>.kafka.topic|Corresponding topic of data source|
 
+**Parameters for Debezium data source**
+
+|Parameters|Description|
+|:---:|:---:|
+|\<source_name\>.kafka.server|Kafka address. Format:<br>\<ip\>:\<port\>|
+
 **Other parameters**
 
 |Parameters|Description|Default|
@@ -98,4 +114,5 @@ In the configuration file for each data source, specify the table which the data
 ## 1.5 Reference
 
 [Maxwell Reference](http://maxwells-daemon.io/)  
+[Debezium Reference](http://debezium.io/) 
 [Kafka Reference](http://kafka.apache.org/)
