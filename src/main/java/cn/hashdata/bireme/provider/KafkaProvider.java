@@ -1,3 +1,7 @@
+/**
+ * Copyright HashData. All Rights Reserved.
+ */
+
 package cn.hashdata.bireme.provider;
 
 import java.util.ArrayList;
@@ -46,6 +50,7 @@ public abstract class KafkaProvider extends Provider {
    *
    * @param cxt the {@code Context}
    * @param providerConfig configuration for the {@code KafkaProvider}
+   * @param test unitest or not
    */
   public KafkaProvider(Context cxt, KafkaProviderConfig providerConfig, boolean test) {
     super(cxt, providerConfig);

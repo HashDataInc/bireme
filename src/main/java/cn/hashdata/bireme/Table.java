@@ -1,3 +1,7 @@
+/**
+ * Copyright HashData. All Rights Reserved.
+ */
+
 package cn.hashdata.bireme;
 
 import java.sql.Connection;

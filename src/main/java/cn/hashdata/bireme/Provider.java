@@ -1,3 +1,7 @@
+/**
+ * Copyright HashData. All Rights Reserved.
+ */
+
 package cn.hashdata.bireme;
 
 import java.sql.Types;
@@ -152,7 +156,7 @@ public abstract class Provider implements Callable<Long> {
      * @param columns the indexes of columns to assemble a csv tuple
      * @param oldValue only for update operation when primary key was updated, we need to get the
      *        old key and delete the old tuple
-     * @return
+     * @return the csv tuple in string
      */
     protected String formatColumns(
         Record record, Table table, ArrayList<Integer> columns, boolean oldValue) {

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Copyright HashData. All Rights Reserved.
 
 NAME="bireme"
 DESC="bireme service"

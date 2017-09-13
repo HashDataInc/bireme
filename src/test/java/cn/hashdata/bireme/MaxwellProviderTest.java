@@ -1,3 +1,7 @@
+/**
+ * Copyright HashData. All Rights Reserved.
+ */
+
 package cn.hashdata.bireme;
 
 import org.apache.kafka.clients.consumer.ConsumerRecords;
