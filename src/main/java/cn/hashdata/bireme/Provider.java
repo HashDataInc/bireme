@@ -41,7 +41,7 @@ public abstract class Provider implements Callable<Long> {
     this.changeSetOut = cxt.changeSetQueue;
     this.idleTransformer = new LinkedBlockingQueue<Transformer>();
 
-    this.logger = LogManager.getLogger(Provider.class + getProviderName());
+    this.logger = LogManager.getLogger("Bireme." + Provider.class + " " + getProviderName());
     this.recordMeter = cxt.metrics.meter(MetricRegistry.name(Provider.class, getProviderName()));
   }
 

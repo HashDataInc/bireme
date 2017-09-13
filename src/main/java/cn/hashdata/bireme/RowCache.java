@@ -126,9 +126,7 @@ public class RowCache {
 
     RowBatchMerger batch = null;
 
-    do {
-      batch = rowBatchMergers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
-    } while (batch == null && !cxt.stop);
+    batch = rowBatchMergers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
 
     return batch;
   }
@@ -151,7 +149,7 @@ public class RowCache {
      *
      * @param cxt The bireme context
      * @param mappedTableName the destination table
-     * @param rows  batch of {@code Rows} to be merged
+     * @param rows batch of {@code Rows} to be merged
      * @param callbacks the {@code CommitCallbacks} in this batch.
      */
     public RowBatchMerger(Context cxt, String mappedTableName, ArrayList<Row> rows,
