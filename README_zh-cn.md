@@ -1,5 +1,7 @@
 # bireme
 
+[![Build Status](https://travis-ci.org/HashDataInc/bireme.svg)](https://travis-ci.org/HashDataInc/bireme)
+
 [入门指南](docs/bireme_guide_zh-cn.md)
 
 Bireme 是一个 Greenplum / HashData 数据仓库的**增量**同步工具。目前支持 MySQL、PostgreSQL 和 MongoDB 数据源。  
