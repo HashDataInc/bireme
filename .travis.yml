@@ -1,0 +1,31 @@
+language: java
+cache:
+  directories:
+  - $HOME/.m2/repository
+
+sudo: required
+
+jdk:
+  - oraclejdk8
+
+services:
+  - docker
+
+
+before_install:
+  - sudo service mysql-5.6 stop || sudo service mysql stop
+  - sudo /etc/init.d/postgresql stop
+  - docker -v
+  - docker ps -a
+  - wget https://archive.apache.org/dist/maven/maven-3/3.3.9/binaries/apache-maven-3.3.9-bin.zip
+  - unzip -qq apache-maven-3.3.9-bin.zip
+  - export M2_HOME=$PWD/apache-maven-3.3.9
+  - export PATH=$M2_HOME/bin:$PATH
+  - export HOST_IP=`ifconfig en0 | awk '/ *inet /{print $2}'`
+  - mvn -version
+
+install: true
+
+script: 
+  - sudo apt-get install jsvc
+  - integration_test/integration_test.sh
