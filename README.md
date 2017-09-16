@@ -1,5 +1,7 @@
 # bireme
 
+[![Build Status](https://travis-ci.org/HashDataInc/bireme.svg)](https://travis-ci.org/HashDataInc/bireme)
+
 [中文文档](README_zh-cn.md)
 
 [Getting Started Guide](docs/bireme_guide.md)
