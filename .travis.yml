@@ -11,7 +11,7 @@ jdk:
 services:
   - docker
 
-env
+env:
   - SOURCE=debezium
 
 before_install:
