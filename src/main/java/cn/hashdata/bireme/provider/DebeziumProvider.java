@@ -82,6 +82,7 @@ public class DebeziumProvider extends KafkaProvider {
 
         JsonElement element = null;
         switch (op) {
+          case 'r':
           case 'c':
             type = RowType.INSERT;
             element = payLoad.get("after");
@@ -95,6 +96,10 @@ public class DebeziumProvider extends KafkaProvider {
           case 'd':
             type = RowType.DELETE;
             element = payLoad.get("before");
+            break;
+
+          default:
+            type = RowType.UNKNOWN;
             break;
         }
 
@@ -182,6 +187,10 @@ public class DebeziumProvider extends KafkaProvider {
 
       JsonObject payLoad = value.getAsJsonObject("payload");
       DebeziumRecord record = new DebeziumRecord(change.topic(), payLoad);
+
+      if (record.type == RowType.UNKNOWN) {
+        return false;
+      }
 
       Table table = cxt.tablesInfo.get(getMappedTableName(record));
 

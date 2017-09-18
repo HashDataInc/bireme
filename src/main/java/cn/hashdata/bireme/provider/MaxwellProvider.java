@@ -112,6 +112,10 @@ public class MaxwellProvider extends KafkaProvider {
           case "delete":
             type = RowType.DELETE;
             break;
+
+          default:
+            type = RowType.UNKNOWN;
+            break;
         }
       }
 
@@ -167,6 +171,10 @@ public class MaxwellProvider extends KafkaProvider {
       MaxwellProvider p = (MaxwellProvider) changeSet.provider;
       if (!p.providerConfig.tableMap.containsKey(fullTableName)) {
         // Do not sync this table
+        return true;
+      }
+
+      if (record.type == RowType.UNKNOWN) {
         return true;
       }
 
