@@ -11,6 +11,8 @@ jdk:
 services:
   - docker
 
+env
+  - SOURCE=debezium
 
 before_install:
   - sudo service mysql-5.6 stop || sudo service mysql stop
@@ -20,8 +22,7 @@ before_install:
 
 install: true
 
-script: 
-  - mvn docker:start
+script:
   - integration_test/produce_data.sh
   # - integration_test/test.sh
 

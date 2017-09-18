@@ -3,8 +3,9 @@ set -xeu
 CI_DIR=${PWD}/integration_test
 SOURCE_DIR=${CI_DIR}/${SOURCE}
 
-# # cp -f ETC_DIR/pom.xml PROJECT_DIR/pom.xml
+cp -f ETC_DIR/pom.xml PROJECT_DIR/pom.xml
 
+mvn docker:start
 mvn clean package
 
 tar -xf $(ls target/*.tar.gz) -C target
