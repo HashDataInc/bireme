@@ -1,0 +1,17 @@
+   1 | -9223372036854775808 | -123.456
+   2 |  9223372036854775807 |   12.345
+   3 |                  100 |      100
+ 400 |                  100 |      100
+
+  1 | rocks | hashdata | Bireme is an incremental synchronization tool for the G
+reenplum / HashData data warehouse
+  2 | spare | pivotal  | symble test " \                                        
+                                  +
+    |       |          | new line
+
+  1 | 2017-09-18 | 10:29:00
+  2 | 2017-09-18 | 10:29:00.123
+
+  1 | \x1a1b1c3d1f | t    | 110000011101100
+  2 | \xabcdef1234 | f    | 001100111100011
+
