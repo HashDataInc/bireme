@@ -122,79 +122,82 @@
 	</dependencies>
 
 	<build>
+		<plugins>
+			<plugin>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<version>3.0.0</version>
+				<configuration>
+					<descriptors>
+						<descriptor>src/main/assembly/assembly.xml</descriptor>
+					</descriptors>
+					<finalName>bireme</finalName>
+					<appendAssemblyId>false</appendAssemblyId>
+				</configuration>
+				<executions>
+					<execution>
+						<id>make-tar</id> <!-- this is used for inheritance merges -->
+						<phase>package</phase> <!-- bind to the packaging phase -->
+						<goals>
+							<goal>single</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>1.6.0</version>
+				<executions>
+					<execution>
+						<id>Format Code Style</id>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>exec</goal>
+						</goals>
+						<configuration>
+							<executable>${basedir}/scripts/format.sh</executable>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>3.0.0-M1</version>
+				<configuration>
+					<locale>en_US</locale>
+					<jarOutputDirectory>${project.build.directory}/sourceAndJavadoc</jarOutputDirectory>
+				</configuration>
+				<executions>
+					<execution>
+						<id>attach-javadocs</id>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-source-plugin</artifactId>
+				<version>3.0.1</version>
+				<configuration>
+					<outputDirectory>${project.build.directory}/sourceAndJavadoc</outputDirectory>
+				</configuration>
+				<executions>
+					<execution>
+						<id>attach-sources</id>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>jar-no-fork</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
 		<pluginManagement>
 			<plugins>
-				<plugin>
-					<artifactId>maven-assembly-plugin</artifactId>
-					<version>3.0.0</version>
-					<configuration>
-						<descriptors>
-							<descriptor>src/main/assembly/assembly.xml</descriptor>
-						</descriptors>
-						<appendAssemblyId>false</appendAssemblyId>
-					</configuration>
-					<executions>
-						<execution>
-							<id>make-tar</id> <!-- this is used for inheritance merges -->
-							<phase>package</phase> <!-- bind to the packaging phase -->
-							<goals>
-								<goal>single</goal>
-							</goals>
-						</execution>
-					</executions>
-				</plugin>
-				<plugin>
-					<groupId>org.codehaus.mojo</groupId>
-					<artifactId>exec-maven-plugin</artifactId>
-					<version>1.6.0</version>
-					<executions>
-						<execution>
-							<id>Format Code Style</id>
-							<phase>generate-sources</phase>
-							<goals>
-								<goal>exec</goal>
-							</goals>
-							<configuration>
-								<executable>${basedir}/scripts/format.sh</executable>
-							</configuration>
-						</execution>
-					</executions>
-				</plugin>
-				<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-javadoc-plugin</artifactId>
-					<version>3.0.0-M1</version>
-					<configuration>
-						<locale>en_US</locale>
-						<jarOutputDirectory>${project.build.directory}/sourceAndJavadoc</jarOutputDirectory>
-					</configuration>
-					<executions>
-						<execution>
-							<id>attach-javadocs</id>
-							<phase>generate-sources</phase>
-							<goals>
-								<goal>jar</goal>
-							</goals>
-						</execution>
-					</executions>
-				</plugin>
-				<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-source-plugin</artifactId>
-					<version>3.0.1</version>
-					<configuration>
-						<outputDirectory>${project.build.directory}/sourceAndJavadoc</outputDirectory>
-					</configuration>
-					<executions>
-						<execution>
-							<id>attach-sources</id>
-							<phase>generate-sources</phase>
-							<goals>
-								<goal>jar-no-fork</goal>
-							</goals>
-						</execution>
-					</executions>
-				</plugin>
 				<!--This plugin's configuration is used to store Eclipse m2e settings 
 					only. It has no influence on the Maven build itself. -->
 				<plugin>

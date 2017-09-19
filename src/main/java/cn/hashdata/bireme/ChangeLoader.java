@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -25,7 +24,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Triple;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.postgresql.copy.CopyManager;
@@ -57,7 +55,6 @@ public class ChangeLoader implements Callable<Long> {
   protected LoadTask currentTask;
   ExecutorService threadPool;
   private String mappedTable;
-  protected LinkedBlockingQueue<Triple<String, CommitCallback, String>> positionUpdateQueue;
 
   private Timer copyForDeleteTimer;
   private Timer deleteTimer;
@@ -134,11 +131,6 @@ public class ChangeLoader implements Callable<Long> {
       }
     } catch (InterruptedException ignore) {
     } catch (Exception e) {
-      try {
-        markError();
-      } catch (InterruptedException ignore) {
-      }
-
       logger.error(
           "Loader exit on error, corresponding table {}. Message {}", mappedTable, e.getMessage());
       return 0L;
@@ -475,21 +467,6 @@ public class ChangeLoader implements Callable<Long> {
       try {
         pipeOut.close();
       } catch (IOException ignore) {
-      }
-    }
-  }
-
-  private void markError() throws InterruptedException {
-    boolean success;
-
-    for (Entry<String, String> entry : cxt.tableMap.entrySet()) {
-      if (!entry.getValue().equals(mappedTable)) {
-        continue;
-      } else {
-        do {
-          success = positionUpdateQueue.offer(
-              Triple.of(entry.getKey(), null, "Error"), TIMEOUT_MS, TimeUnit.MILLISECONDS);
-        } while (!success && !cxt.stop);
       }
     }
   }

@@ -23,8 +23,7 @@ before_install:
 install: true
 
 script:
-  - integration_test/produce_data.sh
-  #- integration_test/test.sh
+  - integration_test/test.sh
 
 after_script:
   - mvn clean

@@ -158,14 +158,15 @@ public abstract class Provider implements Callable<Long> {
      *        old key and delete the old tuple
      * @return the csv tuple in string
      */
-    protected String formatColumns(
-        Record record, Table table, ArrayList<Integer> columns, boolean oldValue) {
+    protected String formatColumns(Record record, Table table, ArrayList<Integer> columns,
+        boolean oldValue) {
       tupleStringBuilder.setLength(0);
 
       for (int i = 0; i < columns.size(); ++i) {
         int columnIndex = columns.get(i);
         String columnName = table.columnName.get(columnIndex);
         String data = record.getField(columnName, oldValue);
+        int fieldType = table.columnType.get(columnIndex);
 
         switch (table.columnType.get(columnIndex)) {
           case Types.CHAR:
@@ -203,7 +204,15 @@ public abstract class Provider implements Callable<Long> {
             }
             break;
           }
-
+          case Types.DATE:
+          case Types.TIME: {
+            if (data != null) {
+              int precision = table.columnScale.get(columnIndex);
+              String time = decodeToTime(data, fieldType, precision);
+              tupleStringBuilder.append(time);
+            }
+            break;
+          }
           default: {
             if (data != null) {
               tupleStringBuilder.append(data);
@@ -231,18 +240,30 @@ public abstract class Provider implements Callable<Long> {
     protected abstract byte[] decodeToBinary(String data);
 
     /**
-     * For bit type, {@code Transformer} need to decode the extracted string and decode it to
-     * origin bit.
+     * For bit type, {@code Transformer} need to decode the extracted string and decode it to origin
+     * bit.
      *
      * @param data the encoded string
      * @param precision the length of the bit field, acquired from the table's metadata
-     * @return the  string of 1 or 0
+     * @return the string of 1 or 0
      */
 
     protected abstract String decodeToBit(String data, int precision);
 
     /**
+     * For Date/Time type, {@code Transformer} need to decode the extracted string and decode it to
+     * origin Date/Time string.
+     * 
+     * @param data the encoded string from provider
+     * @param fieldType concrete type of this field, such as Time, Date
+     * @param precision specifies the number of fractional digits retained in the seconds field
+     * @return the Date/Time format
+     */
+    protected abstract String decodeToTime(String data, int fieldType, int precision);
+
+    /**
      * Add escape character to a data string.
+     * 
      * @param data the origin string
      * @return the modified string
      */

@@ -4,8 +4,14 @@
 
 package cn.hashdata.bireme.provider;
 
+import java.sql.Types;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.Iterator;
+import java.util.TimeZone;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.ArrayUtils;
@@ -219,7 +225,7 @@ public class DebeziumProvider extends KafkaProvider {
         case "true":
           return "1";
         case "false":
-          return "2";
+          return "0";
       }
 
       StringBuilder sb = new StringBuilder();
@@ -236,6 +242,45 @@ public class DebeziumProvider extends KafkaProvider {
       result = sb.toString();
 
       return result.substring(result.length() - precision);
+    }
+
+    @Override
+    protected String decodeToTime(String data, int fieldType, int precision) {
+      StringBuilder sb = new StringBuilder();
+
+      switch (fieldType) {
+        case Types.TIME: {
+          int sec = Integer.parseInt(data.substring(0, data.length() - 9));
+          String fraction = data.substring(data.length() - 9, data.length() - 9 + precision);
+          Date d = new Date(sec * 1000L);
+          SimpleDateFormat df = new SimpleDateFormat("HH:mm:ss");
+          df.setTimeZone(TimeZone.getTimeZone("GMT"));
+          
+          sb.append(df.format(d));
+          sb.append('.'+fraction);
+          break;
+        }
+
+        case Types.DATE: {
+          SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+          Calendar c = Calendar.getInstance();
+          try {
+            c.setTime(sdf.parse("1970-01-01"));
+          } catch (ParseException e) {
+            logger.error("Can not decode Data/Time {}, message{}.", data, e.getMessage());
+            return "";
+          }
+          c.add(Calendar.DATE, Integer.parseInt(data));
+          sb.append(sdf.format(c.getTime()));
+          break;
+        }
+
+        default:
+          sb.append(data);
+          break;
+      }
+
+      return sb.toString();
     }
   }
 }

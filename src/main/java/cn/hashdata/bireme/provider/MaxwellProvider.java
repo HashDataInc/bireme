@@ -229,6 +229,11 @@ public class MaxwellProvider extends KafkaProvider {
       String binaryStr = Integer.toBinaryString(Integer.valueOf(data));
       return String.format("%" + precision + "s", binaryStr).replace(' ', '0');
     }
+    
+    @Override
+    protected String decodeToTime(String data, int fieldType, int precision) {
+      return data;
+    }
 
     @Override
     public boolean transform(ConsumerRecord<String, String> change, Row row) {
