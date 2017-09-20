@@ -1,7 +1,6 @@
 set -xeu
 
 PREPARE_DATA=$(cat $SOURCE_DIR/setup.sql)
-DOCKER_RUN='docker run -it'
 CONNECTOR_CONFIG='
 {
     "name": "inventory-connector",
@@ -28,7 +27,7 @@ $DOCKER_RUN --name Connect -p 8083:8083 \
             --link Zookeeper:Zookeeper --link Kafka:Kafka --link Postgres:Postgres \
             -d debezium/connect:0.5
 
-while [[ $(docker logs Connect | grep "Finished starting connectors and tasks") = "" ]]
+until $(docker logs Connect | grep -q "Finished starting connectors and tasks")
 do
     sleep 1
 done

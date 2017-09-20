@@ -27,7 +27,7 @@ CREATE TABLE binarysource (
 INSERT INTO numericsource 
 VALUES (1, -9223372036854775808, -123.456),
        (2, 9223372036854775807, 12.345),
-       (3, 100, 100),
+       (3, 100, null),
        (4, 100, 100),
        (5, 100, 100);
 
@@ -45,7 +45,7 @@ VALUES (1, decode('1A1B1C3D1F', 'hex'), true, B'110000011101100'),
        (2, decode('ABCDEF1234', 'hex'), false, B'001100111100011');
 
 UPDATE numericsource
-SET alpha = 100
+SET alpha = 101
 WHERE id = 3;
 
 UPDATE numericsource

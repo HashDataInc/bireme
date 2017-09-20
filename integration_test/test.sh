@@ -2,6 +2,7 @@ set -xeu
 
 export SOURCE_DIR=${PWD}/integration_test/${SOURCE}
 export DOCKER_EXEC='docker exec -it'
+export DOCKER_RUN='docker run -it'
 
 ${SOURCE_DIR}/prepare.sh
 
