@@ -1,12 +1,14 @@
 set -xeu
 
+export SOURCE=debezium
 export SOURCE_DIR=${PWD}/integration_test/${SOURCE}
 export DOCKER_EXEC='docker exec -it'
 
-cp -f ${SOURCE_DIR}/pom.xml ./pom.xml
+pushd ${SOURCE_DIR}
+	mvn docker:start
+popd
 
-mvn docker:start
-${SOURCE_DIR}/prepare_data.sh
+${SOURCE_DIR}/prepare.sh
 
 mvn clean package -Dmaven.test.skip=true
 

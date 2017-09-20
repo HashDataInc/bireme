@@ -1,6 +1,7 @@
 set -xeu
 
 PREPARE_DATA=$(cat $SOURCE_DIR/setup.sql)
+DOCKER_RUN='docker run -it'
 CONNECTOR_CONFIG='
 {
     "name": "inventory-connector",
@@ -14,6 +15,15 @@ CONNECTOR_CONFIG='
         "database.server.name": "debezium_CI"
     }
 }'
+
+# $DOCKER_RUN --name Zookeeper -p 2181:2181 -p 2888:2888 -p 3888:3888 -d debezium/zookeeper:0.5
+# $DOCKER_RUN --name Kafka -p 9092:9092 --link Zookeeper:Zookeeper -d debezium/kafka:0.5
+# $DOCKER_RUN --name Postgres -p 5432:5432 -d debezium/postgres:latest
+# $DOCKER_RUN --name Connect -p 8083:8083 \
+#             -e CONFIG_STORAGE_TOPIC=my_connect_configs \
+#             -e OFFSET_STORAGE_TOPIC=my_connect_offsets \
+#             --link Zookeeper:Zookeeper --link Kafka:Kafka --link Postgres:Postgres \
+#             -d debezium/connect:0.5
 
 curl -i -X POST -H "Accept:application/json" \
                 -H "Content-Type:application/json" localhost:8083/connectors/ \

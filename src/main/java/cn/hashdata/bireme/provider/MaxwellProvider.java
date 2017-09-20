@@ -111,10 +111,6 @@ public class MaxwellProvider extends KafkaProvider {
           case "delete":
             type = RowType.DELETE;
             break;
-
-          default:
-            type = RowType.UNKNOWN;
-            break;
         }
       }
 
@@ -159,10 +155,6 @@ public class MaxwellProvider extends KafkaProvider {
         return true;
       }
 
-      if (record.type == RowType.UNKNOWN) {
-        return true;
-      }
-
       return false;
     }
 
@@ -177,11 +169,6 @@ public class MaxwellProvider extends KafkaProvider {
     protected String decodeToBit(String data, int precision) {
       String binaryStr = Integer.toBinaryString(Integer.valueOf(data));
       return String.format("%" + precision + "s", binaryStr).replace(' ', '0');
-    }
-    
-    @Override
-    protected String decodeToTime(String data, int fieldType, int precision) {
-      return data;
     }
 
     @Override

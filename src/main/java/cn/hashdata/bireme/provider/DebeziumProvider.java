@@ -102,10 +102,6 @@ public class DebeziumProvider extends KafkaProvider {
             type = RowType.DELETE;
             element = payLoad.get("before");
             break;
-
-          default:
-            type = RowType.UNKNOWN;
-            break;
         }
 
         this.data = element.getAsJsonObject();
@@ -149,10 +145,6 @@ public class DebeziumProvider extends KafkaProvider {
 
       JsonObject payLoad = value.getAsJsonObject("payload");
       DebeziumRecord record = new DebeziumRecord(change.topic(), payLoad);
-
-      if (record.type == RowType.UNKNOWN) {
-        return false;
-      }
 
       Table table = cxt.tablesInfo.get(getMappedTableName(record));
 
@@ -217,10 +209,9 @@ public class DebeziumProvider extends KafkaProvider {
           Date d = new Date(sec * 1000L);
           SimpleDateFormat df = new SimpleDateFormat("HH:mm:ss");
           df.setTimeZone(TimeZone.getTimeZone("GMT"));
-          
-          sb.append(df.format(d));
-          sb.append('.'+fraction);
 
+          sb.append(df.format(d));
+          sb.append('.' + fraction);
           break;
         }
 

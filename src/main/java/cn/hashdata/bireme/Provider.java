@@ -158,8 +158,8 @@ public abstract class Provider implements Callable<Long> {
      *        old key and delete the old tuple
      * @return the csv tuple in string
      */
-    protected String formatColumns(Record record, Table table, ArrayList<Integer> columns,
-        boolean oldValue) {
+    protected String formatColumns(
+        Record record, Table table, ArrayList<Integer> columns, boolean oldValue) {
       tupleStringBuilder.setLength(0);
 
       for (int i = 0; i < columns.size(); ++i) {
@@ -167,7 +167,6 @@ public abstract class Provider implements Callable<Long> {
         int sqlType = table.columnType.get(columnIndex);
         String columnName = table.columnName.get(columnIndex);
         String data = record.getField(columnName, oldValue);
-        int fieldType = table.columnType.get(columnIndex);
 
         switch (sqlType) {
           case Types.CHAR:
@@ -205,13 +204,6 @@ public abstract class Provider implements Callable<Long> {
             }
             break;
           }
-<<<<<<< HEAD
-          case Types.DATE:
-          case Types.TIME: {
-            if (data != null) {
-              int precision = table.columnScale.get(columnIndex);
-              String time = decodeToTime(data, fieldType, precision);
-=======
 
           case Types.DATE:
           case Types.TIME:
@@ -219,15 +211,11 @@ public abstract class Provider implements Callable<Long> {
             if (data != null) {
               int precision = table.columnScale.get(columnIndex);
               String time = decodeToTime(data, sqlType, precision);
->>>>>>> 9894cf3cb40582fb9fd75ee0b0fe58eb364e6f4d
               tupleStringBuilder.append(time);
             }
             break;
           }
-<<<<<<< HEAD
-=======
 
->>>>>>> 9894cf3cb40582fb9fd75ee0b0fe58eb364e6f4d
           default: {
             if (data != null) {
               tupleStringBuilder.append(data);
