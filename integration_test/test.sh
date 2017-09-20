@@ -4,10 +4,6 @@ export SOURCE=debezium
 export SOURCE_DIR=${PWD}/integration_test/${SOURCE}
 export DOCKER_EXEC='docker exec -it'
 
-pushd ${SOURCE_DIR}
-	mvn docker:start
-popd
-
 ${SOURCE_DIR}/prepare.sh
 
 mvn clean package -Dmaven.test.skip=true
