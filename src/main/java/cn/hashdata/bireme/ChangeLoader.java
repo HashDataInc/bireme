@@ -24,7 +24,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Triple;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.postgresql.copy.CopyManager;
@@ -56,7 +55,6 @@ public class ChangeLoader implements Callable<Long> {
   protected LoadTask currentTask;
   ExecutorService threadPool;
   private String mappedTable;
-  protected LinkedBlockingQueue<Triple<String, CommitCallback, String>> positionUpdateQueue;
 
   private Timer copyForDeleteTimer;
   private Timer deleteTimer;
