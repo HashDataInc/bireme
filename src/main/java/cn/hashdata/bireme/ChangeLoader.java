@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -134,11 +133,6 @@ public class ChangeLoader implements Callable<Long> {
       }
     } catch (InterruptedException ignore) {
     } catch (Exception e) {
-      try {
-        markError();
-      } catch (InterruptedException ignore) {
-      }
-
       logger.error(
           "Loader exit on error, corresponding table {}. Message {}", mappedTable, e.getMessage());
       return 0L;
@@ -475,21 +469,6 @@ public class ChangeLoader implements Callable<Long> {
       try {
         pipeOut.close();
       } catch (IOException ignore) {
-      }
-    }
-  }
-
-  private void markError() throws InterruptedException {
-    boolean success;
-
-    for (Entry<String, String> entry : cxt.tableMap.entrySet()) {
-      if (!entry.getValue().equals(mappedTable)) {
-        continue;
-      } else {
-        do {
-          success = positionUpdateQueue.offer(
-              Triple.of(entry.getKey(), null, "Error"), TIMEOUT_MS, TimeUnit.MILLISECONDS);
-        } while (!success && !cxt.stop);
       }
     }
   }
