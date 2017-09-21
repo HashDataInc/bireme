@@ -110,7 +110,6 @@ public class Config {
     target = getConnConfig("target");
     if (target.jdbcUrl == null) {
       String message = "Please designate url for target Database.";
-      logger.fatal(message);
       throw new BiremeException(message);
     }
   }
@@ -118,7 +117,7 @@ public class Config {
   /**
    * Get the connection configuration to database.
    *
-   * @param prefix "target"  database
+   * @param prefix "target" database
    * @return {@code ConnectionConfig} to database.
    */
   protected ConnectionConfig getConnConfig(String prefix) {
@@ -132,7 +131,7 @@ public class Config {
     return connectionConfig;
   }
 
-  protected void dataSourceConfig() throws BiremeException {
+  protected void dataSourceConfig() throws BiremeException, ConfigurationException {
     String[] sources = config.getString("data_source").replaceAll("[ \f\n\r\t]", "").split(",");
     if (sources == null || sources.length == 0) {
       String message = "Please designate at least one data source.";
@@ -149,9 +148,10 @@ public class Config {
   /**
    * Get the {@code Provider} configuration.
    *
-   * @throws BiremeException - wrap and throw Exception which cannot be handled
+   * @throws BiremeException wrap and throw Exception which cannot be handled
+   * @throws ConfigurationException if an error occurred when loading the configuration
    */
-  protected void fetchProviderAndTableMap() throws BiremeException {
+  protected void fetchProviderAndTableMap() throws BiremeException, ConfigurationException {
     loadersCount = 0;
 
     for (int i = 0; i < dataSource.size(); i++) {
@@ -209,7 +209,7 @@ public class Config {
    *
    * @param prefix the Provider's name
    * @return {@code MaxwellConfig} for {@code MaxwellProvider}
-   * @throws BiremeException - wrap and throw Exception which cannot be handled
+   * @throws BiremeException - miss some required configuration
    */
   protected KafkaProviderConfig fetchMaxwellConfig(String prefix) throws BiremeException {
     Configuration subConfig = new SubsetConfiguration(config, prefix, ".");
@@ -221,28 +221,23 @@ public class Config {
 
     if (maxwellConf.server == null) {
       String message = "Please designate server for " + prefix + ".";
-      logger.fatal(message);
       throw new BiremeException(message);
     }
 
     if (maxwellConf.topic == null) {
       String message = "Please designate topic for " + prefix + ".";
-      logger.fatal(message);
       throw new BiremeException(message);
     }
 
     return maxwellConf;
   }
 
-  private HashMap<String, String> fetchTableMap(String dataSource) throws BiremeException {
+  private HashMap<String, String> fetchTableMap(String dataSource)
+      throws ConfigurationException, BiremeException {
     Configurations configs = new Configurations();
     Configuration tableConfig = null;
 
-    try {
-      tableConfig = configs.properties(new File(DEFAULT_TABLEMAP_DIR + dataSource + ".properties"));
-    } catch (ConfigurationException e) {
-      throw new BiremeException(e);
-    }
+    tableConfig = configs.properties(new File(DEFAULT_TABLEMAP_DIR + dataSource + ".properties"));
 
     String originTable, mappedTable;
     HashMap<String, String> localTableMap = new HashMap<String, String>();
@@ -273,14 +268,13 @@ public class Config {
    * Print log about bireme configuration.
    */
   public void logConfig() {
-    String config = "Configures: "
-        + "\n\tchangeSet queue size = " + changeset_queue_size + "\n\ttransform thread pool size = "
-        + transform_pool_size + "\n\ttransform result queue size = " + trans_result_queue_size
-        + "\n\trow cache size = " + row_cache_size + "\n\tmerge thread pool size = "
-        + merge_pool_size + "\n\tmerge interval = " + merge_interval
-        + "\n\tbatch size = " + batch_size + "\n\tloader conn size = " + loader_conn_size
-        + "\n\tloader task queue size = " + loader_task_queue_size
-        + "\n\treport interval = " + report_interval;
+    String config = "Configures: " + "\n\tchangeSet queue size = " + changeset_queue_size
+        + "\n\ttransform thread pool size = " + transform_pool_size
+        + "\n\ttransform result queue size = " + trans_result_queue_size + "\n\trow cache size = "
+        + row_cache_size + "\n\tmerge thread pool size = " + merge_pool_size
+        + "\n\tmerge interval = " + merge_interval + "\n\tbatch size = " + batch_size
+        + "\n\tloader conn size = " + loader_conn_size + "\n\tloader task queue size = "
+        + loader_task_queue_size + "\n\treport interval = " + report_interval;
     logger.info(config);
 
     StringBuilder sb = new StringBuilder();

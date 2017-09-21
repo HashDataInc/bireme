@@ -19,6 +19,7 @@ public interface Record {
    *        key and delete the old tuple
    *
    * @return the value in string
+   * @throws BiremeException when can not get the field value
    */
-  String getField(String fieldName, boolean oldValue);
+  String getField(String fieldName, boolean oldValue) throws BiremeException;
 }

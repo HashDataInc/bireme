@@ -128,6 +128,8 @@ public abstract class Provider implements Callable<Long> {
     /**
      * Borrow an empty {@code RowSet} and write the data acquired from {@code ChangeSet} to the
      * {@code RowSet}. Finally, return the filled {@code RowSet}.
+     * 
+     * @throws BiremeException when unable to transform the recoed
      */
     @Override
     public RowSet call() throws BiremeException {
@@ -157,16 +159,19 @@ public abstract class Provider implements Callable<Long> {
      * @param oldValue only for update operation when primary key was updated, we need to get the
      *        old key and delete the old tuple
      * @return the csv tuple in string
+     * @throws BiremeException when can not get the field value
      */
-    protected String formatColumns(
-        Record record, Table table, ArrayList<Integer> columns, boolean oldValue) {
+    protected String formatColumns(Record record, Table table, ArrayList<Integer> columns,
+        boolean oldValue) throws BiremeException {
       tupleStringBuilder.setLength(0);
 
       for (int i = 0; i < columns.size(); ++i) {
         int columnIndex = columns.get(i);
         int sqlType = table.columnType.get(columnIndex);
         String columnName = table.columnName.get(columnIndex);
-        String data = record.getField(columnName, oldValue);
+        String data = null;
+
+        data = record.getField(columnName, oldValue);
 
         switch (sqlType) {
           case Types.CHAR:

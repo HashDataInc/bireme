@@ -12,9 +12,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 /**
  * {@code Table} stores table's metadata acquired from database. Metadata includes:
  * <ul>
@@ -29,7 +26,6 @@ import org.apache.logging.log4j.Logger;
  * @author yuze
  */
 public class Table {
-  private Logger logger = LogManager.getLogger("Bireme." + Table.class);
 
   public int ncolumns;
   public ArrayList<String> columnName;
@@ -77,7 +73,6 @@ public class Table {
       rs = dbMetaData.getTables(null, schema, table, new String[] {"TABLE"});
       if (!rs.next()) {
         String message = "Table " + schema + "." + table + " does no exist.";
-        logger.fatal(message);
         throw new BiremeException(message);
       }
 
@@ -88,7 +83,6 @@ public class Table {
       }
       if (this.keyIndexs.size() == 0) {
         String message = "Table " + schema + "." + table + " has no primary key.";
-        logger.fatal(message);
         throw new BiremeException(message);
       }
 
@@ -109,9 +103,8 @@ public class Table {
         conn.close();
       } catch (SQLException ignore) {
       }
-
-      logger.fatal("Could not get metadata for {}.{}", schema, table);
-      throw new BiremeException(e);
+      String message = "Could not get metadata for " + schema + "." + table + ".\n";
+      throw new BiremeException(message, e);
     }
   }
 }

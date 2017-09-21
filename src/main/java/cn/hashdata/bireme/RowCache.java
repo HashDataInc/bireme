@@ -54,11 +54,11 @@ public class RowCache {
    *
    * @param newRows the array of {@code Rows}
    * @param callback the corresponding {@code CommitCallback}
-   * @throws InterruptedException if interrupted while waiting
    * @throws BiremeException Exception while borrow from pool
+   * @throws InterruptedException if interrupted while waiting
    */
   public void addRows(ArrayList<Row> newRows, CommitCallback callback)
-      throws InterruptedException, BiremeException {
+      throws BiremeException, InterruptedException {
     createBatch();
 
     for (Row row : newRows) {
@@ -84,10 +84,10 @@ public class RowCache {
    * @param interval The minimum time between two operations
    * @param maxSize The amount condition to trigger the operation
    * @return the drained array of {@code Rows}
-   * @throws InterruptedException if interrupted while waiting
    * @throws BiremeException Exception while borrow from pool
+   * @throws InterruptedException if interrupted while waiting
    */
-  private synchronized void createBatch() throws InterruptedException, BiremeException {
+  private synchronized void createBatch() throws BiremeException, InterruptedException {
     if (new Date().getTime() - lastTaskTime < mergeInterval && rows.size() < batchSize) {
       return;
     }
@@ -101,7 +101,8 @@ public class RowCache {
     try {
       rows = cxt.idleRowArrays.borrowObject();
     } catch (Exception e) {
-      throw new BiremeException(e);
+      String message = "Can't not borrow RowArrays from the Object Pool.\n";
+      throw new BiremeException(message, e);
     }
 
     this.rows.drainTo(rows);
@@ -125,11 +126,10 @@ public class RowCache {
    * @throws InterruptedException if interrupted while waiting
    * @throws BiremeException - Exception while borrow from pool
    */
-  public RowBatchMerger fetchBatch() throws InterruptedException, BiremeException {
+  public RowBatchMerger fetchBatch() throws BiremeException, InterruptedException{
     createBatch();
 
     RowBatchMerger batch = null;
-
     batch = rowBatchMergers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
 
     return batch;
@@ -167,7 +167,7 @@ public class RowCache {
     /**
      * Run the {@code RowBatchMerger}.
      */
-    public LoadTask call() throws InterruptedException {
+    public LoadTask call() {
       Thread.currentThread().setName("RowBatchMerger");
 
       LoadTask task = new LoadTask(mappedTableName);

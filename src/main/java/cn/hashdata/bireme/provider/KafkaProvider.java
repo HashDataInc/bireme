@@ -102,7 +102,7 @@ public abstract class KafkaProvider extends Provider {
       changeSet.changes = records;
       changeSet.callback = callback;
     } catch (Exception e) {
-      String message = "Can't not borrow ChangeSet from the Object Pool.";
+      String message = "Can't not borrow ChangeSet from the Object Pool.\n";
       throw new BiremeException(message, e);
     }
 
@@ -120,6 +120,9 @@ public abstract class KafkaProvider extends Provider {
    * Start the {@code KafkaProvider}. It constantly poll data from the designated
    * {@code TopicPartition} and pack the change data into {@code ChangeSet}, transfer it to the
    * Change Set Queue in Context.
+   * 
+   * @throws BiremeException can not borrow changeset from object pool
+   * @throws InterruptedException if interrupted while waiting
    */
   @Override
   public Long call() throws BiremeException, InterruptedException {
@@ -158,9 +161,9 @@ public abstract class KafkaProvider extends Provider {
           checkAndCommit();
         } while (!success && !cxt.stop);
       }
-    } catch (BiremeException | InterruptedException e) {
-      logger.error("Provider {} exit on error. Message {}", getProviderName(), e.getMessage());
-
+    } catch (BiremeException e) {
+      logger.fatal("Provider {} exit on error. Message ", getProviderName(), e.getMessage());
+      logger.fatal("Stack Trace: ", e);
       throw e;
     } finally {
       try {
@@ -187,13 +190,12 @@ public abstract class KafkaProvider extends Provider {
       HashMap<TopicPartition, Long> offsets = ((KafkaCommitCallback) callback).partitionOffset;
       Row row = null;
 
-      for (ConsumerRecord<String, String> change :
-          (ConsumerRecords<String, String>) changeSet.changes) {
+      for (ConsumerRecord<String, String> change : (ConsumerRecords<String, String>) changeSet.changes) {
         try {
           row = cxt.idleRows.borrowObject();
         } catch (Exception e) {
           String message = "Can't not borrow RowSet from the Object Pool.";
-          new BiremeException(message, e);
+          throw new BiremeException(message, e);
         }
 
         if (!transform(change, row)) {
@@ -216,8 +218,10 @@ public abstract class KafkaProvider extends Provider {
      * @param row an empty {@code Row} to store the result.
      * @return {@code true} if transform the change data successfully, {@code false} it the change
      *         data is null or filtered
+     * @throws BiremeException when can not get the field
      */
-    public abstract boolean transform(ConsumerRecord<String, String> change, Row row);
+    public abstract boolean transform(ConsumerRecord<String, String> change, Row row)
+        throws BiremeException;
   }
 
   public class KafkaCommitCallback extends AbstractCommitCallback {
@@ -244,8 +248,9 @@ public abstract class KafkaProvider extends Provider {
     public void commit() {
       HashMap<TopicPartition, OffsetAndMetadata> offsets =
           new HashMap<TopicPartition, OffsetAndMetadata>();
-      partitionOffset.forEach(
-          (key, value) -> { offsets.put(key, new OffsetAndMetadata(value + 1)); });
+      partitionOffset.forEach((key, value) -> {
+        offsets.put(key, new OffsetAndMetadata(value + 1));
+      });
 
       consumer.commitSync(offsets);
       committed.set(true);

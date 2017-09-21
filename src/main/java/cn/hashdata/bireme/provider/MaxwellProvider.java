@@ -17,6 +17,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import cn.hashdata.bireme.BiremeException;
 import cn.hashdata.bireme.Context;
 import cn.hashdata.bireme.Record;
 import cn.hashdata.bireme.Row;
@@ -115,7 +116,7 @@ public class MaxwellProvider extends KafkaProvider {
       }
 
       @Override
-      public String getField(String fieldName, boolean oldValue) {
+      public String getField(String fieldName, boolean oldValue) throws BiremeException {
         JsonElement element = null;
         String field = null;
 
@@ -123,6 +124,19 @@ public class MaxwellProvider extends KafkaProvider {
           element = old.get(fieldName);
         } else {
           element = data.get(fieldName);
+        }
+
+        if (element == null) {
+          String jsonData = null;
+
+          if (oldValue) {
+            jsonData = old.toString();
+          } else {
+            jsonData = data.toString();
+          }
+
+          throw new BiremeException("Record does not have a field named \"" + fieldName
+              + "\". Record: " + jsonData + "\n");
         }
 
         if (!element.isJsonNull()) {
@@ -172,7 +186,8 @@ public class MaxwellProvider extends KafkaProvider {
     }
 
     @Override
-    public boolean transform(ConsumerRecord<String, String> change, Row row) {
+    public boolean transform(ConsumerRecord<String, String> change, Row row)
+        throws BiremeException {
       MaxwellRecord record = new MaxwellRecord(change.value());
 
       if (filter(record)) {

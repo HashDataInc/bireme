@@ -76,8 +76,8 @@ public class ChangeLoader implements Callable<Long> {
     taskIn = new LinkedBlockingQueue<Future<LoadTask>>(conf.loader_task_queue_size);
     threadPool = Executors.newFixedThreadPool(1);
 
-    cxt.metrics.register(
-        MetricRegistry.name(Context.class, "TaskQueue for " + mappedTable), new Gauge<Integer>() {
+    cxt.metrics.register(MetricRegistry.name(Context.class, "TaskQueue for " + mappedTable),
+        new Gauge<Integer>() {
           @Override
           public Integer getValue() {
             return taskIn.size();
@@ -117,7 +117,7 @@ public class ChangeLoader implements Callable<Long> {
 
         try {
           executeTask();
-        } catch (Exception e) {
+        } catch (InterruptedException | BiremeException e) {
           try {
             conn.rollback();
           } catch (Exception ignore) {
@@ -129,10 +129,10 @@ public class ChangeLoader implements Callable<Long> {
           currentTask = null;
         }
       }
-    } catch (InterruptedException ignore) {
-    } catch (Exception e) {
-      logger.error(
-          "Loader exit on error, corresponding table {}. Message {}", mappedTable, e.getMessage());
+    } catch (InterruptedException | BiremeException e) {
+      logger.error("Loader exit on error, corresponding table {}. Message {}\n", mappedTable,
+          e.getMessage());
+      logger.fatal("Stack Trace: ", e);
       return 0L;
     } finally {
       threadPool.shutdown();
@@ -146,8 +146,8 @@ public class ChangeLoader implements Callable<Long> {
    * Check whether {@code Rows} have been merged to a task. If done, poll the task and return.
    *
    * @return a task need be load to database
-   * @throws InterruptedException - if interrupted while waiting
-   * @throws BiremeException - wrap and throw Exception which cannot be handled
+   * @throws InterruptedException if interrupted while waiting
+   * @throws BiremeException merge task failed
    */
   protected LoadTask pollTask() throws InterruptedException, BiremeException {
     LoadTask task = null;
@@ -161,7 +161,7 @@ public class ChangeLoader implements Callable<Long> {
         try {
           task = head.get();
         } catch (ExecutionException e) {
-          throw new BiremeException(e.getCause());
+          throw new BiremeException("Merge task failed.\n", e.getCause());
         }
 
         if (task != null) {
@@ -212,10 +212,10 @@ public class ChangeLoader implements Callable<Long> {
   /**
    * Load the task to destination database. First load the delete set and then load the insert set.
    *
-   * @throws InterruptedException - if interrupted while waiting
    * @throws BiremeException - Wrap and throw Exception which cannot be handled
+   * @throws InterruptedException - if interrupted while waiting
    */
-  protected void executeTask() throws InterruptedException, BiremeException {
+  protected void executeTask() throws BiremeException, InterruptedException {
     if (!currentTask.delete.isEmpty() || (!optimisticMode && !currentTask.insert.isEmpty())) {
       int size = currentTask.delete.size();
 
@@ -238,7 +238,8 @@ public class ChangeLoader implements Callable<Long> {
           conn.commit();
         }
       } catch (SQLException e) {
-        throw new BiremeException(e);
+        String message = cxt.stop ? "Rollback failed\n" : "Commit failed\n";
+        throw new BiremeException(message, e);
       }
     }
 
@@ -255,7 +256,8 @@ public class ChangeLoader implements Callable<Long> {
           conn.commit();
         }
       } catch (SQLException e) {
-        throw new BiremeException(e);
+        String message = cxt.stop ? "Rollback failed" : "Commit failed";
+        throw new BiremeException(message, e);
       }
     }
 
@@ -326,7 +328,7 @@ public class ChangeLoader implements Callable<Long> {
     try {
       pipeIn = new PipedInputStream(pipeOut);
     } catch (IOException e) {
-      throw new BiremeException(e);
+      throw new BiremeException("I/O error occurs while create PipedInputStream.", e);
     }
 
     String sql = getCopySql(tableName, columnList);
@@ -345,20 +347,16 @@ public class ChangeLoader implements Callable<Long> {
 
       copyCount = copyResult.get();
     } catch (ExecutionException e) {
-      throw new BiremeException(e.getCause());
+      throw new BiremeException("Copy failed.", e.getCause());
     }
 
     return copyCount;
   }
 
   private String getCopySql(String tableName, List<String> columnList) {
-    StringBuilder sb =
-        new StringBuilder()
-            .append("COPY ")
-            .append(tableName)
-            .append(" (")
-            .append(StringUtils.join(columnList, ","))
-            .append(") FROM STDIN WITH DELIMITER '|' NULL '' CSV QUOTE '\"' ESCAPE E'\\\\';");
+    StringBuilder sb = new StringBuilder().append("COPY ").append(tableName).append(" (")
+        .append(StringUtils.join(columnList, ","))
+        .append(") FROM STDIN WITH DELIMITER '|' NULL '' CSV QUOTE '\"' ESCAPE E'\\\\';");
     String sql = sb.toString();
     return sql;
   }
@@ -382,7 +380,7 @@ public class ChangeLoader implements Callable<Long> {
     try {
       count = (long) conn.createStatement().executeUpdate(sql);
     } catch (SQLException e) {
-      throw new BiremeException(e);
+      throw new BiremeException("Delete failed.", e);
     }
 
     return count;
@@ -420,7 +418,7 @@ public class ChangeLoader implements Callable<Long> {
       }
 
     } catch (SQLException e) {
-      throw new BiremeException(e);
+      throw new BiremeException("Fail to get delete plan.", e);
     }
   }
 
@@ -462,7 +460,7 @@ public class ChangeLoader implements Callable<Long> {
 
       pipeOut.flush();
     } catch (IOException e) {
-      throw new BiremeException(e);
+      throw new BiremeException("I/O error occurs while write to pipe.", e);
     } finally {
       try {
         pipeOut.close();
@@ -483,7 +481,7 @@ public class ChangeLoader implements Callable<Long> {
       conn.createStatement().executeUpdate(sql);
       conn.commit();
     } catch (SQLException e) {
-      throw new BiremeException(e);
+      throw new BiremeException("Fail to create tmporary table.", e);
     }
   }
 }
