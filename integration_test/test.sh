@@ -23,10 +23,10 @@ rm -f source.txt target.txt
 touch source.txt target.txt
 
 case $SOURCE in
-	'maxwel')
+	'maxwell')
 		python ${SOURCE_DIR}/check_result.py
 	;;
-	'maxwell')
+	'debezium')
 		${SOURCE_DIR}/check_result.sh
 	;;
 esac
