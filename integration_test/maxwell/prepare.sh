@@ -11,7 +11,6 @@ $DOCKER_RUN --name MySQL -p 3306:3306 \
 $DOCKER_RUN --name Postgres -p 5432:5432 -d postgres:latest
 $DOCKER_RUN --name Zookeeper -p 2181:2181 -d zookeeper:latest
 $DOCKER_RUN --name Kafka -p 9092:9092 \
-			-e ADVERTISED_HOST_NAME=$HOST_IP \
             -e ZOOKEEPER_CONNECT=Zookeeper:2181 \
             --link Zookeeper:Zookeeper -d debezium/kafka:0.5
 

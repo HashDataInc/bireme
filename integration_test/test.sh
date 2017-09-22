@@ -22,8 +22,11 @@ ${BIREME}/bin/bireme stop
 rm -f source.txt target.txt
 touch source.txt target.txt
 
-if [[ $SOURCE='maxwell' ]]; then
-	python ${SOURCE_DIR}/check_result.py
-else
-	${SOURCE_DIR}/check_result.sh
-fi
+case $SOURCE in
+	'maxwel')
+		python ${SOURCE_DIR}/check_result.py
+	;;
+	'maxwell')
+		${SOURCE_DIR}/check_result.sh
+	;;
+esac
