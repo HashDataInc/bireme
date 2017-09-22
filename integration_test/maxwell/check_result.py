@@ -3,13 +3,13 @@ import psycopg2
 import datetime
 import binascii
 
-MYSQL_HOST = "localhost"
+MYSQL_HOST = "127.0.0.1"
 MYSQL_PORT = 3306
 MYSQL_USER = "root"
 MYSQL_PASSWORD = "123456"
 MYSQL_DB = "demo"
 
-PG_HOST = "localhost"
+PG_HOST = "127.0.0.1"
 PG_PORT = 5432
 PG_USER = "postgres"
 PG_PASSWORD = "postgres"
@@ -18,7 +18,7 @@ PG_DB = "postgres"
 
 try:
     mysqlConnection = MySQLdb.connect(host=MYSQL_HOST, port=MYSQL_PORT,
-    	user=MYSQL_USER, passwd=MYSQL_PASSWORD, db=MYSQL_DB)
+        user=MYSQL_USER, passwd=MYSQL_PASSWORD, db=MYSQL_DB)
 
     dbhandler = mysqlConnection.cursor()
     
@@ -39,7 +39,7 @@ finally:
 
 try:
     pgConnection = psycopg2.connect(host=PG_HOST, port=PG_PORT,
-                               user=PG_USER, password=PG_PASSWORD, dbname=PG_DB)
+        user=PG_USER, password=PG_PASSWORD, dbname=PG_DB)
 
     dbhandler = pgConnection.cursor()
     
