@@ -1,5 +1,6 @@
 import MySQLdb
 import psycopg2
+import binascii
 import re
 from cStringIO import StringIO
 
@@ -40,7 +41,7 @@ def mysqldump(tuples, types):
 
     for line in tuples:
         for i in length:
-            if re.search("binary.*|bit.*|blob.*|text.*", types[i]):
+            if re.search("binary.*|bit.*|blob.*", types[i]):
                 fileStr.write(str(binascii.hexlify(line[i]))+"\t")
             else:
                 fileStr.write(str(line[i])+"\t")
@@ -56,9 +57,9 @@ def pgdump(tuples, types):
             if re.search("bytea", types[i]):
                 fileStr.write(str(binascii.hexlify(line[i]))+"\t")
             elif re.search("bit", types[i]):
-                fileStr.write(str(int(line[i], 2))+"\t")
+                fileStr.write(str(hex(int(line[i], 2))[2:])+"\t")
             elif re.search("boolean", types[i]):
-                fileStr.write("1" if line[i] else "0")
+                fileStr.write("1\t" if line[i] else "0\t")
             else:
                 fileStr.write(str(line[i])+"\t")
         fileStr.write("\n")

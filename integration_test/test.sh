@@ -1,5 +1,6 @@
 set -xeu
 
+export TEST_DIR=${PWD}/integration_test
 export SOURCE_DIR=${PWD}/integration_test/${SOURCE}
 export DOCKER_EXEC='docker exec -it'
 export DOCKER_RUN='docker run -it'

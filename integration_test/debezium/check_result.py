@@ -1,5 +1,6 @@
 import sys
-sys.path.append("../")
+import os
+sys.path.append(os.environ["TEST_DIR"])
 from sqldump import sqldump
 
 with open('source.txt', 'w') as f:
