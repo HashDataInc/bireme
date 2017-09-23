@@ -3,13 +3,13 @@ sys.path.append("../")
 from sqldump import sqldump
 
 with open('source.txt', 'w') as f:
-	table = sqldump("mysql","127.0.0.1", 3306, "root", "123456", "demo", "binarysource", "id")
+	table = sqldump("postgres","127.0.0.1", 5432, "postgres", "postgres", "postgres", "binarysource", "id")
 	f.write(table)
-	table = sqldump("mysql","127.0.0.1", 3306, "root", "123456", "demo", "charsource", "id")
+	table = sqldump("postgres","127.0.0.1", 5432, "postgres", "postgres", "postgres", "charsource", "id")
 	f.write(table)
-	table = sqldump("mysql","127.0.0.1", 3306, "root", "123456", "demo", "numericsource", "id")
+	table = sqldump("postgres","127.0.0.1", 5432, "postgres", "postgres", "postgres", "numericsource", "id")
 	f.write(table)
-	table = sqldump("mysql","127.0.0.1", 3306, "root", "123456", "demo", "timesource", "id")
+	table = sqldump("postgres","127.0.0.1", 5432, "postgres", "postgres", "postgres", "timesource", "id")
 	f.write(table)
 	
 with open('target.txt', 'w') as f:

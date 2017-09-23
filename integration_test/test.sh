@@ -19,14 +19,5 @@ ${BIREME}/bin/bireme start
 sleep 20
 ${BIREME}/bin/bireme stop
 
-rm -f source.txt target.txt
-touch source.txt target.txt
 
-case $SOURCE in
-	'maxwell')
-		python ${SOURCE_DIR}/check_result.py
-	;;
-	'debezium')
-		${SOURCE_DIR}/check_result.sh
-	;;
-esac
+python ${SOURCE_DIR}/check_result.py
