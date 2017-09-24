@@ -72,10 +72,7 @@ def pgdump(dbhandler, types):
             elif re.search("bit", types[i]):
                 fileStr.write(str(hex(int(line[i], 2))[2:])+"\t")
             elif re.search("boolean", types[i]):
-                if line[i]:
-                    fileStr.write("1\t")
-                else:
-                    fileStr.write("0\t")
+                fileStr.write("0\t" if not line[i] else "1\t")
             else:
                 fileStr.write(str(line[i])+"\t")
         fileStr.write("\n")
