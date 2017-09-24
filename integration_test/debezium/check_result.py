@@ -4,7 +4,7 @@ sys.path.append(os.environ["TEST_DIR"])
 from sqldump import sqldump
 
 with open('source.txt', 'w') as f:
-	table = sqldump("postgres","127.0.0.1", 5432, "postgres", "postgres", "postgres", "binarysource", "id")
+    table = sqldump("postgres","127.0.0.1", 5432, "postgres", "postgres", "postgres", "binarysource", "id")
     f.write(table)
     table = sqldump("postgres","127.0.0.1", 5432, "postgres", "postgres", "postgres", "charsource", "id")
     f.write(table)
