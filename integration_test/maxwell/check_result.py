@@ -28,6 +28,8 @@ with open("source.txt") as source:
 		sourceContent = source.read()
 		targetContent = target.read()
 		if sourceContent == targetContent:
+			print "Source:\n" + sourceContent
+			print "Target:\n" + targetContent
 			exit(0)
 		else:
 			print "Source:\n" + sourceContent

@@ -41,8 +41,9 @@ VALUES (1, '2017-09-18', '10:29:00'),
        (2, '2017-09-18', '10:29:00.123');
 
 INSERT INTO binarysource
-VALUES (1, X'1A1B1C3D1F', true, B'110000011101100'),
-       (2, X'ABCDEF1234', false, B'001100111100011');
+VALUES (1, X'1A1B1C3D1F', false, B'110000011101100'),
+       (2, X'ABCDEF1234', true, B'001100111100011'),
+       (3, X'1A2B3C4D5E', false, B'101010011001100');
 
 UPDATE numericsource
 SET alpha = 101
