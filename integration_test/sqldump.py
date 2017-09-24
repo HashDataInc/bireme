@@ -59,7 +59,7 @@ def pgdump(dbhandler, types):
     length = range(0, len(types))
     fileStr = StringIO()
 
-    while Ture:
+    while True:
         line = dbhandler.fetchone()
         if not line:
             break;
