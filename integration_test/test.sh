@@ -1,5 +1,6 @@
 set -xeu
 
+export TEST_DIR=${PWD}/integration_test
 export SOURCE_DIR=${PWD}/integration_test/${SOURCE}
 export DOCKER_EXEC='docker exec -it'
 export DOCKER_RUN='docker run -it'
@@ -19,7 +20,5 @@ ${BIREME}/bin/bireme start
 sleep 20
 ${BIREME}/bin/bireme stop
 
-rm -f source.txt target.txt
-touch source.txt target.txt
 
-${SOURCE_DIR}/examine.sh
+python ${SOURCE_DIR}/check_result.py
