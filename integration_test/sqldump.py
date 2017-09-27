@@ -45,7 +45,7 @@ def mysqldump(dbhandler, types):
             break;
 
         for i in length:
-            if line[i] == None:
+            if line[i] is None:
                 fileStr.write(str(line[i])+"\t")
             elif re.search("binary.*|bit.*|blob.*", types[i]):
                 fileStr.write(str(binascii.hexlify(line[i]))+"\t")
@@ -65,7 +65,7 @@ def pgdump(dbhandler, types):
             break;
 
         for i in length:
-            if line[i] == None:
+            if line[i] is None:
                 fileStr.write(str(line[i])+"\t")
             elif re.search("bytea", types[i]):
                 fileStr.write(str(binascii.hexlify(line[i]))+"\t")
