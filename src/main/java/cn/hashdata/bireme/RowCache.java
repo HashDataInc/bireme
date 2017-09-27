@@ -126,7 +126,7 @@ public class RowCache {
    * @throws InterruptedException if interrupted while waiting
    * @throws BiremeException - Exception while borrow from pool
    */
-  public RowBatchMerger fetchBatch() throws BiremeException, InterruptedException{
+  public RowBatchMerger fetchBatch() throws BiremeException, InterruptedException {
     createBatch();
 
     RowBatchMerger batch = null;

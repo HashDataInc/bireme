@@ -12,7 +12,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -77,8 +76,6 @@ public class MaxwellProvider extends KafkaProvider {
    *
    */
   public class MaxwellChangeTransformer extends KafkaTransformer {
-    protected Gson gson;
-
     public class MaxwellRecord implements Record {
       public String dataSource;
       public String database;
@@ -149,7 +146,6 @@ public class MaxwellProvider extends KafkaProvider {
 
     public MaxwellChangeTransformer() {
       super();
-      this.gson = new Gson();
     }
 
     private String getMappedTableName(MaxwellRecord record) {

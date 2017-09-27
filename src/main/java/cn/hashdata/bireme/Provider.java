@@ -128,7 +128,7 @@ public abstract class Provider implements Callable<Long> {
     /**
      * Borrow an empty {@code RowSet} and write the data acquired from {@code ChangeSet} to the
      * {@code RowSet}. Finally, return the filled {@code RowSet}.
-     * 
+     *
      * @throws BiremeException when unable to transform the recoed
      */
     @Override

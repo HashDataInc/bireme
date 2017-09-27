@@ -76,8 +76,8 @@ public class ChangeLoader implements Callable<Long> {
     taskIn = new LinkedBlockingQueue<Future<LoadTask>>(conf.loader_task_queue_size);
     threadPool = Executors.newFixedThreadPool(1);
 
-    cxt.metrics.register(MetricRegistry.name(Context.class, "TaskQueue for " + mappedTable),
-        new Gauge<Integer>() {
+    cxt.metrics.register(
+        MetricRegistry.name(Context.class, "TaskQueue for " + mappedTable), new Gauge<Integer>() {
           @Override
           public Integer getValue() {
             return taskIn.size();
@@ -354,9 +354,13 @@ public class ChangeLoader implements Callable<Long> {
   }
 
   private String getCopySql(String tableName, List<String> columnList) {
-    StringBuilder sb = new StringBuilder().append("COPY ").append(tableName).append(" (")
-        .append(StringUtils.join(columnList, ","))
-        .append(") FROM STDIN WITH DELIMITER '|' NULL '' CSV QUOTE '\"' ESCAPE E'\\\\';");
+    StringBuilder sb =
+        new StringBuilder()
+            .append("COPY ")
+            .append(tableName)
+            .append(" (")
+            .append(StringUtils.join(columnList, ","))
+            .append(") FROM STDIN WITH DELIMITER '|' NULL '' CSV QUOTE '\"' ESCAPE E'\\\\';");
     String sql = sb.toString();
     return sql;
   }

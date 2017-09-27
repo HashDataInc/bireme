@@ -26,7 +26,6 @@ import java.util.ArrayList;
  * @author yuze
  */
 public class Table {
-
   public int ncolumns;
   public ArrayList<String> columnName;
   public ArrayList<Integer> columnType;

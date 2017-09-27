@@ -198,8 +198,10 @@ public class Bireme implements Daemon {
   protected void startReporter() {
     switch (cxt.conf.reporter) {
       case "console":
-        consoleReporter = ConsoleReporter.forRegistry(cxt.metrics).convertRatesTo(TimeUnit.SECONDS)
-            .convertDurationsTo(TimeUnit.MILLISECONDS).build();
+        consoleReporter = ConsoleReporter.forRegistry(cxt.metrics)
+                              .convertRatesTo(TimeUnit.SECONDS)
+                              .convertDurationsTo(TimeUnit.MILLISECONDS)
+                              .build();
         consoleReporter.start(cxt.conf.report_interval, TimeUnit.SECONDS);
         break;
       case "jmx":

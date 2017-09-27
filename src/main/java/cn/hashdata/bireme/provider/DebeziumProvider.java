@@ -19,7 +19,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -75,8 +74,6 @@ public class DebeziumProvider extends KafkaProvider {
   }
 
   public class DebeziumTransformer extends KafkaTransformer {
-    protected Gson gson;
-
     public class DebeziumRecord implements Record {
       public String topic;
       public RowType type;
@@ -130,7 +127,6 @@ public class DebeziumProvider extends KafkaProvider {
 
     public DebeziumTransformer() {
       super();
-      this.gson = new Gson();
     }
 
     private String getMappedTableName(DebeziumRecord record) {

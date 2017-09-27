@@ -120,7 +120,7 @@ public abstract class KafkaProvider extends Provider {
    * Start the {@code KafkaProvider}. It constantly poll data from the designated
    * {@code TopicPartition} and pack the change data into {@code ChangeSet}, transfer it to the
    * Change Set Queue in Context.
-   * 
+   *
    * @throws BiremeException can not borrow changeset from object pool
    * @throws InterruptedException if interrupted while waiting
    */
@@ -190,7 +190,8 @@ public abstract class KafkaProvider extends Provider {
       HashMap<TopicPartition, Long> offsets = ((KafkaCommitCallback) callback).partitionOffset;
       Row row = null;
 
-      for (ConsumerRecord<String, String> change : (ConsumerRecords<String, String>) changeSet.changes) {
+      for (ConsumerRecord<String, String> change :
+          (ConsumerRecords<String, String>) changeSet.changes) {
         try {
           row = cxt.idleRows.borrowObject();
         } catch (Exception e) {
@@ -248,9 +249,8 @@ public abstract class KafkaProvider extends Provider {
     public void commit() {
       HashMap<TopicPartition, OffsetAndMetadata> offsets =
           new HashMap<TopicPartition, OffsetAndMetadata>();
-      partitionOffset.forEach((key, value) -> {
-        offsets.put(key, new OffsetAndMetadata(value + 1));
-      });
+      partitionOffset.forEach(
+          (key, value) -> { offsets.put(key, new OffsetAndMetadata(value + 1)); });
 
       consumer.commitSync(offsets);
       committed.set(true);
