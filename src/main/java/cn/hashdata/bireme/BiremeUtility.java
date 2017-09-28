@@ -30,7 +30,14 @@ public class BiremeUtility {
     return conn;
   }
 
-  public static String getIgnoreCase(JsonObject data, String fieldName) throws BiremeException {
+  /**
+   * Given the key, return the json value as String, ignoring case considerations. 
+   * @param data the JsonObject
+   * @param fieldName the key
+   * @return the value as String
+   * @throws BiremeException when the JsonObject doesn't have the key
+   */
+  public static String jsonGetIgnoreCase(JsonObject data, String fieldName) throws BiremeException {
     JsonElement element = data.get(fieldName);
 
     if (element == null) {

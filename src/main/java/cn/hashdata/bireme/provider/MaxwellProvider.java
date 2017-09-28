@@ -118,13 +118,13 @@ public class MaxwellProvider extends KafkaProvider {
 
         if (oldValue) {
           try {
-            field = BiremeUtility.getIgnoreCase(old, fieldName);
+            field = BiremeUtility.jsonGetIgnoreCase(old, fieldName);
             return field;
           } catch (BiremeException ignore) {
           }
         }
 
-        return BiremeUtility.getIgnoreCase(data, fieldName);
+        return BiremeUtility.jsonGetIgnoreCase(data, fieldName);
       }
     }
 

@@ -108,7 +108,7 @@ public class DebeziumProvider extends KafkaProvider {
 
       @Override
       public String getField(String fieldName, boolean oldValue) throws BiremeException {
-        return BiremeUtility.getIgnoreCase(data, fieldName);
+        return BiremeUtility.jsonGetIgnoreCase(data, fieldName);
       }
     }
 
