@@ -31,7 +31,7 @@ public class BiremeUtility {
   }
 
   /**
-   * Given the key, return the json value as String, ignoring case considerations. 
+   * Given the key, return the json value as String, ignoring case considerations.
    * @param data the JsonObject
    * @param fieldName the key
    * @return the value as String

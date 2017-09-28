@@ -21,6 +21,7 @@ import org.apache.commons.pool2.impl.DefaultPooledObject;
 public class Row {
   public enum RowType { INSERT, UPDATE, DELETE }
 
+  public Long produceTime;
   public RowType type;
   public String originTable;
   public String mappedTable;

@@ -4,6 +4,7 @@
 
 package cn.hashdata.bireme;
 
+import java.util.Date;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -15,12 +16,14 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  */
 public abstract class AbstractCommitCallback implements CommitCallback {
+  protected Long receiveTime;
   protected int numOfTables;
   protected AtomicInteger numOfCommitedTables;
   protected AtomicBoolean committed;
   protected AtomicBoolean ready;
 
   public AbstractCommitCallback() {
+    this.receiveTime = new Date().getTime();
     this.numOfCommitedTables = new AtomicInteger();
     this.committed = new AtomicBoolean();
     this.ready = new AtomicBoolean();
@@ -45,5 +48,10 @@ public abstract class AbstractCommitCallback implements CommitCallback {
   @Override
   public boolean ready() {
     return ready.get();
+  }
+
+  @Override
+  public Long getReceiveTime() {
+    return receiveTime;
   }
 }

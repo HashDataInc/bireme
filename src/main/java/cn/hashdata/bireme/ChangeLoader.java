@@ -11,6 +11,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -52,6 +53,7 @@ public class ChangeLoader implements Callable<Long> {
   protected Connection conn;
   protected LinkedBlockingQueue<Future<LoadTask>> taskIn;
   protected Table table;
+  protected LoadStatus status;
   protected LoadTask currentTask;
   ExecutorService threadPool;
   private String mappedTable;
@@ -71,6 +73,7 @@ public class ChangeLoader implements Callable<Long> {
     this.cxt = cxt;
     this.conf = cxt.conf;
     this.conn = null;
+    this.status = null;
     this.mappedTable = mappedTable;
     this.table = cxt.tablesInfo.get(mappedTable);
     taskIn = new LinkedBlockingQueue<Future<LoadTask>>(conf.loader_task_queue_size);
@@ -260,6 +263,9 @@ public class ChangeLoader implements Callable<Long> {
         throw new BiremeException(message, e);
       }
     }
+
+    currentTask.loadStatus.setCompleteTime(new Date().getTime());
+    status = currentTask.loadStatus;
 
     for (CommitCallback callback : currentTask.callbacks) {
       callback.done();

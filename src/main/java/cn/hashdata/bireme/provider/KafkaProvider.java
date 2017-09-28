@@ -5,7 +5,6 @@
 package cn.hashdata.bireme.provider;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Properties;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -98,7 +97,6 @@ public abstract class KafkaProvider extends Provider {
     try {
       changeSet = cxt.idleChangeSets.borrowObject();
       changeSet.provider = this;
-      changeSet.createdAt = new Date();
       changeSet.changes = records;
       changeSet.callback = callback;
     } catch (Exception e) {
