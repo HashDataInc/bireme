@@ -1,0 +1,32 @@
+language: java
+cache:
+  directories:
+  - $HOME/.m2/repository
+
+sudo: required
+
+jdk:
+  - oraclejdk8
+
+services:
+  - docker
+
+env:
+  - SOURCE=debezium
+  - SOURCE=maxwell
+
+before_install:
+  - sudo service mysql-5.6 stop || sudo service mysql stop
+  - sudo /etc/init.d/postgresql stop
+  - sudo apt-get install jsvc
+  - sudo pip install MySQL-python
+  - sudo pip install psycopg2
+
+install: true
+
+script:
+  - integration_test/test.sh
+
+after_script:
+  - mvn clean
+  - docker stop $(docker -a -q)
