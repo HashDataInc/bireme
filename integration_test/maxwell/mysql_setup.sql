@@ -34,7 +34,8 @@ VALUES (1, -9223372036854775808, -123.456),
 INSERT INTO charsource
 VALUES (1, 'rocks', 'hashdata', 'Bireme is an incremental synchronization tool for the Greenplum / HashData data warehouse'),
        (2, 'spare', 'pivotal', 'symble test " \ 
-new line');
+new line'),
+       (3, 'abcde', '', '');
 
 INSERT INTO timesource
 VALUES (1, '2017-09-18', '10:29:00'),

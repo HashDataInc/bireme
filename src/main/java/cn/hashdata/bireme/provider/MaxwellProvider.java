@@ -12,11 +12,11 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import cn.hashdata.bireme.BiremeException;
+import cn.hashdata.bireme.BiremeUtility;
 import cn.hashdata.bireme.Context;
 import cn.hashdata.bireme.Record;
 import cn.hashdata.bireme.Row;
@@ -114,33 +114,17 @@ public class MaxwellProvider extends KafkaProvider {
 
       @Override
       public String getField(String fieldName, boolean oldValue) throws BiremeException {
-        JsonElement element = null;
         String field = null;
 
-        if (oldValue && old.has(fieldName)) {
-          element = old.get(fieldName);
-        } else {
-          element = data.get(fieldName);
-        }
-
-        if (element == null) {
-          String jsonData = null;
-
-          if (oldValue) {
-            jsonData = old.toString();
-          } else {
-            jsonData = data.toString();
+        if (oldValue) {
+          try {
+            field = BiremeUtility.jsonGetIgnoreCase(old, fieldName);
+            return field;
+          } catch (BiremeException ignore) {
           }
-
-          throw new BiremeException("Record does not have a field named \"" + fieldName
-              + "\". Record: " + jsonData + "\n");
         }
 
-        if (!element.isJsonNull()) {
-          field = element.getAsString();
-        }
-
-        return field;
+        return BiremeUtility.jsonGetIgnoreCase(data, fieldName);
       }
     }
 
