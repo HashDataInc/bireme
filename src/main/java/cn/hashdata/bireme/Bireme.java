@@ -7,7 +7,6 @@ package cn.hashdata.bireme;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashMap;
@@ -34,7 +33,6 @@ import org.apache.logging.log4j.Logger;
 import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.JmxReporter;
 
-import cn.hashdata.bireme.Config.ConnectionConfig;
 import cn.hashdata.bireme.provider.DebeziumProvider;
 import cn.hashdata.bireme.provider.MaxwellProvider;
 
@@ -94,7 +92,7 @@ public class Bireme implements Daemon {
     logger.info("Start getting metadata of target tables from target database.");
 
     String[] strArray;
-    Connection conn = jdbcConn(cxt.conf.target);
+    Connection conn = BiremeUtility.jdbcConn(cxt.conf.target);
 
     for (String fullname : cxt.tableMap.values()) {
       if (cxt.tablesInfo.containsKey(fullname)) {
@@ -122,7 +120,7 @@ public class Bireme implements Daemon {
 
     try {
       for (int i = 0, number = cxt.conf.loader_conn_size; i < number; i++) {
-        conn = jdbcConn(cxt.conf.target);
+        conn = BiremeUtility.jdbcConn(cxt.conf.target);
         conn.setAutoCommit(true);
         Statement stmt = conn.createStatement();
         stmt.execute("set enable_nestloop = on;");
@@ -310,24 +308,5 @@ public class Bireme implements Daemon {
   public static void main(String[] args) {
     Bireme service = new Bireme();
     service.entry(args);
-  }
-
-  /**
-   * Establish connection to database.
-   *
-   * @param conf configuration of the aimed database
-   * @return the established connection
-   * @throws BiremeException Failed to get connection
-   */
-  public static Connection jdbcConn(ConnectionConfig conf) throws BiremeException {
-    Connection conn = null;
-
-    try {
-      conn = DriverManager.getConnection(conf.jdbcUrl, conf.user, conf.passwd);
-    } catch (SQLException e) {
-      throw new BiremeException("Fail to get connection.\n", e);
-    }
-
-    return conn;
   }
 }

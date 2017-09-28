@@ -24,6 +24,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import cn.hashdata.bireme.BiremeException;
+import cn.hashdata.bireme.BiremeUtility;
 import cn.hashdata.bireme.Context;
 import cn.hashdata.bireme.Record;
 import cn.hashdata.bireme.Row;
@@ -107,21 +108,7 @@ public class DebeziumProvider extends KafkaProvider {
 
       @Override
       public String getField(String fieldName, boolean oldValue) throws BiremeException {
-        JsonElement element = null;
-        String field = null;
-
-        element = data.get(fieldName);
-
-        if (element == null) {
-          throw new BiremeException("Record does not have a field named \"" + fieldName
-              + "\". Record: " + data.toString() + "\n");
-        }
-
-        if (!element.isJsonNull()) {
-          field = element.getAsString();
-        }
-
-        return field;
+        return BiremeUtility.getIgnoreCase(data, fieldName);
       }
     }
 
