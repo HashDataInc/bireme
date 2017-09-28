@@ -22,8 +22,4 @@ public class BiremeException extends Exception {
   public BiremeException(String message, Throwable cause) {
     super(message, cause);
   }
-
-  public BiremeException(Throwable cause) {
-    super(cause);
-  }
 }

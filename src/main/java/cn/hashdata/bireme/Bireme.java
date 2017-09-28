@@ -57,7 +57,7 @@ public class Bireme implements Daemon {
   private JmxReporter jmxReporter;
 
   protected void parseCommandLine(String[] args)
-      throws DaemonInitException, ConfigurationException, BiremeException, InterruptedException {
+      throws DaemonInitException, ConfigurationException, BiremeException {
     Option help = new Option("help", "print this message");
     Option configFile =
         Option.builder("config_file").hasArg().argName("file").desc("config file location").build();
@@ -103,7 +103,6 @@ public class Bireme implements Daemon {
 
       strArray = fullname.split("\\.");
       cxt.tablesInfo.put(fullname, new Table(strArray[0], strArray[1], conn));
-      logger.trace("Get {}'s metadata.", fullname);
     }
 
     try {
@@ -138,8 +137,6 @@ public class Bireme implements Daemon {
         temporatyTables.put(conn, new HashSet<String>());
       }
     } catch (SQLException e) {
-      logger.fatal("Could not establish connection to target database.");
-
       for (Connection closeConn : temporatyTables.keySet()) {
         try {
           closeConn.close();
@@ -147,19 +144,20 @@ public class Bireme implements Daemon {
         }
       }
 
-      throw new BiremeException(e);
+      throw new BiremeException("Could not establish connection to target database.\n", e);
     }
 
     logger.info("Finishing establishing {} connections for loaders.", cxt.conf.loader_conn_size);
   }
 
-  protected void createMaxwellChangeProvider() throws BiremeException {
+  protected void createMaxwellChangeProvider() {
     for (int i = 0, len = cxt.conf.maxwellConf.size(); i < len; i++) {
       Callable<Long> maxwellProvider = new MaxwellProvider(cxt, cxt.conf.maxwellConf.get(i));
       cxt.cs.submit(maxwellProvider);
     }
   }
-  protected void createDebeziumProvider() throws BiremeException {
+
+  protected void createDebeziumProvider() {
     for (int i = 0, len = cxt.conf.debeziumConf.size(); i < len; i++) {
       Callable<Long> debeziumProvider = new DebeziumProvider(cxt, cxt.conf.debeziumConf.get(i));
       cxt.cs.submit(debeziumProvider);
@@ -196,9 +194,8 @@ public class Bireme implements Daemon {
   /**
    * Start metrics reporter.
    *
-   * @throws BiremeException - Wrap and throw Exception which cannot be handled
    */
-  protected void startReporter() throws BiremeException {
+  protected void startReporter() {
     switch (cxt.conf.reporter) {
       case "console":
         consoleReporter = ConsoleReporter.forRegistry(cxt.metrics)
@@ -217,18 +214,28 @@ public class Bireme implements Daemon {
   }
 
   @Override
-  public void init(DaemonContext context) throws DaemonInitException, Exception {
+  public void init(DaemonContext context) throws Exception {
     logger.info("initialize Bireme daemon");
     this.context = context;
-    parseCommandLine(context.getArguments());
+    try {
+      parseCommandLine(context.getArguments());
+    } catch (Exception e) {
+      logger.fatal("start failed. Message: {}.", e.getMessage());
+      logger.fatal("Stack Trace: ", e);
+    }
   }
 
   @Override
-  public void start() throws Exception {
-    logger.info("start Bireme daemon");
-
-    getTableInfo();
-    initLoaderConnections();
+  public void start() throws BiremeException {
+    logger.info("start Bireme daemon.");
+    try {
+      getTableInfo();
+      initLoaderConnections();
+    } catch (BiremeException e) {
+      logger.fatal("start failed. Message: {}.", e.getMessage());
+      logger.fatal("Stack Trace: ", e);
+      throw e;
+    }
 
     createChangeLoaders();
     createTaskGenerator();
@@ -269,9 +276,13 @@ public class Bireme implements Daemon {
     try {
       parseCommandLine(args);
     } catch (DaemonInitException e) {
+      logger.fatal("Init failed: {}.", e.getMessage());
+      logger.fatal("Stack Trace: ", e);
       System.err.println(e.getMessage());
       System.exit(1);
-    } catch (ConfigurationException | InterruptedException | BiremeException e) {
+    } catch (ConfigurationException | BiremeException e) {
+      logger.fatal("Init failed: {}.", e.getMessage());
+      logger.fatal("Stack Trace: ", e);
       e.printStackTrace();
       System.exit(1);
     }
@@ -280,11 +291,10 @@ public class Bireme implements Daemon {
       start();
       cxt.waitForComplete(false);
     } catch (Exception e) {
-      cxt.stop = true;
-      e.printStackTrace();
-
       logger.fatal("Bireme is going to exit since: {}", e.getMessage());
+      logger.fatal("Stack Trace: ", e);
 
+      cxt.stop = true;
       cxt.threadPool.shutdownNow();
       cxt.loaderThreadPool.shutdownNow();
     }
@@ -307,7 +317,7 @@ public class Bireme implements Daemon {
    *
    * @param conf configuration of the aimed database
    * @return the established connection
-   * @throws BiremeException - wrap and throw Exception which cannot be handled
+   * @throws BiremeException Failed to get connection
    */
   public static Connection jdbcConn(ConnectionConfig conf) throws BiremeException {
     Connection conn = null;
@@ -315,7 +325,7 @@ public class Bireme implements Daemon {
     try {
       conn = DriverManager.getConnection(conf.jdbcUrl, conf.user, conf.passwd);
     } catch (SQLException e) {
-      throw new BiremeException(e);
+      throw new BiremeException("Fail to get connection.\n", e);
     }
 
     return conn;

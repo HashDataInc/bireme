@@ -4,8 +4,14 @@
 
 package cn.hashdata.bireme.provider;
 
+import java.sql.Types;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.Iterator;
+import java.util.TimeZone;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.ArrayUtils;
@@ -13,13 +19,12 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import cn.hashdata.bireme.Context;
 import cn.hashdata.bireme.BiremeException;
+import cn.hashdata.bireme.Context;
 import cn.hashdata.bireme.Record;
 import cn.hashdata.bireme.Row;
 import cn.hashdata.bireme.Table;
@@ -69,8 +74,6 @@ public class DebeziumProvider extends KafkaProvider {
   }
 
   public class DebeziumTransformer extends KafkaTransformer {
-    protected Gson gson;
-
     public class DebeziumRecord implements Record {
       public String topic;
       public RowType type;
@@ -82,6 +85,7 @@ public class DebeziumProvider extends KafkaProvider {
 
         JsonElement element = null;
         switch (op) {
+          case 'r':
           case 'c':
             type = RowType.INSERT;
             element = payLoad.get("after");
@@ -102,11 +106,17 @@ public class DebeziumProvider extends KafkaProvider {
       }
 
       @Override
-      public String getField(String fieldName, boolean oldValue) {
+      public String getField(String fieldName, boolean oldValue) throws BiremeException {
         JsonElement element = null;
         String field = null;
 
         element = data.get(fieldName);
+
+        if (element == null) {
+          throw new BiremeException("Record does not have a field named \"" + fieldName
+              + "\". Record: " + data.toString() + "\n");
+        }
+
         if (!element.isJsonNull()) {
           field = element.getAsString();
         }
@@ -117,21 +127,6 @@ public class DebeziumProvider extends KafkaProvider {
 
     public DebeziumTransformer() {
       super();
-      this.gson = new Gson();
-    }
-
-    private String formatTuple(DebeziumRecord record, Table table) {
-      ArrayList<Integer> columns = new ArrayList<Integer>();
-
-      for (int i = 0; i < table.ncolumns; ++i) {
-        columns.add(i);
-      }
-
-      return formatColumns(record, table, columns, false);
-    }
-
-    private String formatKeys(DebeziumRecord record, Table table, boolean oldKey) {
-      return formatColumns(record, table, table.keyIndexs, oldKey);
     }
 
     private String getMappedTableName(DebeziumRecord record) {
@@ -142,37 +137,9 @@ public class DebeziumProvider extends KafkaProvider {
       return record.topic;
     }
 
-    /**
-     * Convert {@code DebeziumRecord} into {@code Row}.
-     *
-     * @param record {@code DebeziumRecord} from Debezium, which is extracted from change data
-     * @param type insert, update or delete
-     * @return the converted row
-     * @throws BiremeException Exception while borrow from pool
-     */
-    public Row convertRecord(DebeziumRecord record, RowType type) throws BiremeException {
-      Table table = cxt.tablesInfo.get(getMappedTableName(record));
-      Row row = null;
-      try {
-        row = cxt.idleRows.borrowObject();
-      } catch (Exception e) {
-        new BiremeException(e.getCause());
-      }
-
-      row.type = type;
-      row.originTable = getOriginTableName(record);
-      row.mappedTable = getMappedTableName(record);
-      row.keys = formatKeys(record, table, false);
-
-      if (type != RowType.DELETE) {
-        row.tuple = formatTuple(record, table);
-      }
-
-      return row;
-    }
-
     @Override
-    public boolean transform(ConsumerRecord<String, String> change, Row row) {
+    public boolean transform(ConsumerRecord<String, String> change, Row row)
+        throws BiremeException {
       JsonParser jsonParser = new JsonParser();
       JsonObject value = (JsonObject) jsonParser.parse(change.value());
 
@@ -188,10 +155,16 @@ public class DebeziumProvider extends KafkaProvider {
       row.type = record.type;
       row.originTable = getOriginTableName(record);
       row.mappedTable = getMappedTableName(record);
-      row.keys = formatKeys(record, table, false);
+      row.keys = formatColumns(record, table, table.keyIndexs, false);
 
       if (row.type != RowType.DELETE) {
-        row.tuple = formatTuple(record, table);
+        ArrayList<Integer> columns = new ArrayList<Integer>();
+
+        for (int i = 0; i < table.ncolumns; ++i) {
+          columns.add(i);
+        }
+
+        row.tuple = formatColumns(record, table, columns, false);
       }
 
       return true;
@@ -210,7 +183,7 @@ public class DebeziumProvider extends KafkaProvider {
         case "true":
           return "1";
         case "false":
-          return "2";
+          return "0";
       }
 
       StringBuilder sb = new StringBuilder();
@@ -227,6 +200,47 @@ public class DebeziumProvider extends KafkaProvider {
       result = sb.toString();
 
       return result.substring(result.length() - precision);
+    }
+
+    @Override
+    protected String decodeToTime(String data, int fieldType, int precision) {
+      StringBuilder sb = new StringBuilder();
+
+      switch (fieldType) {
+        case Types.TIME: {
+          int sec = Integer.parseInt(data.substring(0, data.length() - 9));
+          String fraction = data.substring(data.length() - 9, data.length() - 9 + precision);
+          Date d = new Date(sec * 1000L);
+          SimpleDateFormat df = new SimpleDateFormat("HH:mm:ss");
+          df.setTimeZone(TimeZone.getTimeZone("GMT"));
+
+          sb.append(df.format(d));
+          sb.append('.' + fraction);
+          break;
+        }
+
+        case Types.DATE: {
+          SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+          Calendar c = Calendar.getInstance();
+
+          try {
+            c.setTime(sdf.parse("1970-01-01"));
+          } catch (ParseException e) {
+            logger.error("Can not decode Data/Time {}, message{}.", data, e.getMessage());
+            return "";
+          }
+
+          c.add(Calendar.DATE, Integer.parseInt(data));
+          sb.append(sdf.format(c.getTime()));
+          break;
+        }
+
+        default:
+          sb.append(data);
+          break;
+      }
+
+      return sb.toString();
     }
   }
 }

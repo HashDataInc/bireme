@@ -199,8 +199,8 @@ public class Context {
    * Wait for all threads to exit.
    *
    * @param ignoreError whether to ignore error.
-   * @throws InterruptedException - if interrupted while waiting
-   * @throws BiremeException - Wrap and throw Exception which cannot be handled
+   * @throws InterruptedException if interrupted while waiting
+   * @throws BiremeException thread exit abnormally
    */
   public void waitForComplete(boolean ignoreError) throws BiremeException, InterruptedException {
     while (!threadPool.isTerminated() && !loaderThreadPool.isTerminated()) {
@@ -216,15 +216,15 @@ public class Context {
             cause = e.getCause();
           }
         }
-      }
 
-      if (cause != null && !ignoreError) {
-        try {
-          throw cause;
-        } catch (BiremeException | InterruptedException | RuntimeException e) {
-          throw e;
-        } catch (Throwable e) {
-          throw new BiremeException(e.getMessage(), e);
+        if (cause != null && !ignoreError) {
+          try {
+            throw cause;
+          } catch (BiremeException | InterruptedException | RuntimeException e) {
+            throw e;
+          } catch (Throwable e) {
+            throw new BiremeException(e.getMessage(), e);
+          }
         }
       }
 

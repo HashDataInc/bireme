@@ -12,13 +12,12 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import cn.hashdata.bireme.Context;
 import cn.hashdata.bireme.BiremeException;
+import cn.hashdata.bireme.Context;
 import cn.hashdata.bireme.Record;
 import cn.hashdata.bireme.Row;
 import cn.hashdata.bireme.Table;
@@ -77,8 +76,6 @@ public class MaxwellProvider extends KafkaProvider {
    *
    */
   public class MaxwellChangeTransformer extends KafkaTransformer {
-    protected Gson gson;
-
     public class MaxwellRecord implements Record {
       public String dataSource;
       public String database;
@@ -116,7 +113,7 @@ public class MaxwellProvider extends KafkaProvider {
       }
 
       @Override
-      public String getField(String fieldName, boolean oldValue) {
+      public String getField(String fieldName, boolean oldValue) throws BiremeException {
         JsonElement element = null;
         String field = null;
 
@@ -124,6 +121,19 @@ public class MaxwellProvider extends KafkaProvider {
           element = old.get(fieldName);
         } else {
           element = data.get(fieldName);
+        }
+
+        if (element == null) {
+          String jsonData = null;
+
+          if (oldValue) {
+            jsonData = old.toString();
+          } else {
+            jsonData = data.toString();
+          }
+
+          throw new BiremeException("Record does not have a field named \"" + fieldName
+              + "\". Record: " + jsonData + "\n");
         }
 
         if (!element.isJsonNull()) {
@@ -136,21 +146,6 @@ public class MaxwellProvider extends KafkaProvider {
 
     public MaxwellChangeTransformer() {
       super();
-      this.gson = new Gson();
-    }
-
-    private String formatTuple(MaxwellRecord record, Table table) {
-      ArrayList<Integer> columns = new ArrayList<Integer>();
-
-      for (int i = 0; i < table.ncolumns; ++i) {
-        columns.add(i);
-      }
-
-      return formatColumns(record, table, columns, false);
-    }
-
-    private String formatKeys(MaxwellRecord record, Table table, boolean oldKey) {
-      return formatColumns(record, table, table.keyIndexs, oldKey);
     }
 
     private String getMappedTableName(MaxwellRecord record) {
@@ -173,42 +168,6 @@ public class MaxwellProvider extends KafkaProvider {
       return false;
     }
 
-    /**
-     * Convert {@code MaxwellRecord} into {@code Row}.
-     *
-     * @param record {@code MaxwellRecord} from Maxwell, which is extracted from change data
-     * @param type insert, update or delete
-     * @return the converted row
-     * @throws BiremeException Exception while borrow from pool
-     */
-    public Row convertRecord(MaxwellRecord record, RowType type) throws BiremeException {
-      Table table = cxt.tablesInfo.get(getMappedTableName(record));
-      Row row = null;
-      try {
-        row = cxt.idleRows.borrowObject();
-      } catch (Exception e) {
-        new BiremeException(e.getCause());
-      }
-
-      row.type = type;
-      row.originTable = getOriginTableName(record);
-      row.mappedTable = getMappedTableName(record);
-      row.keys = formatKeys(record, table, false);
-
-      if (type == RowType.INSERT) {
-        row.tuple = formatTuple(record, table);
-      } else if (type == RowType.UPDATE) {
-        row.tuple = formatTuple(record, table);
-        row.oldKeys = formatKeys(record, table, true);
-
-        if (row.keys.equals(row.oldKeys)) {
-          row.oldKeys = null;
-        }
-      }
-
-      return row;
-    }
-
     @Override
     protected byte[] decodeToBinary(String data) {
       byte[] decoded = null;
@@ -223,7 +182,8 @@ public class MaxwellProvider extends KafkaProvider {
     }
 
     @Override
-    public boolean transform(ConsumerRecord<String, String> change, Row row) {
+    public boolean transform(ConsumerRecord<String, String> change, Row row)
+        throws BiremeException {
       MaxwellRecord record = new MaxwellRecord(change.value());
 
       if (filter(record)) {
@@ -235,13 +195,20 @@ public class MaxwellProvider extends KafkaProvider {
       row.type = record.type;
       row.originTable = getOriginTableName(record);
       row.mappedTable = getMappedTableName(record);
-      row.keys = formatKeys(record, table, false);
+      row.keys = formatColumns(record, table, table.keyIndexs, false);
 
-      if (row.type == RowType.INSERT) {
-        row.tuple = formatTuple(record, table);
-      } else if (row.type == RowType.UPDATE) {
-        row.tuple = formatTuple(record, table);
-        row.oldKeys = formatKeys(record, table, true);
+      if (row.type == RowType.INSERT || row.type == RowType.UPDATE) {
+        ArrayList<Integer> columns = new ArrayList<Integer>();
+
+        for (int i = 0; i < table.ncolumns; ++i) {
+          columns.add(i);
+        }
+
+        row.tuple = formatColumns(record, table, columns, false);
+      }
+
+      if (row.type == RowType.UPDATE) {
+        row.oldKeys = formatColumns(record, table, table.keyIndexs, true);
 
         if (row.keys.equals(row.oldKeys)) {
           row.oldKeys = null;

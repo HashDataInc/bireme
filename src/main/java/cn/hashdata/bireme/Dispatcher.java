@@ -55,7 +55,7 @@ public class Dispatcher implements Callable<Long> {
     transformerThreadPool = Executors.newFixedThreadPool(cxt.conf.transform_pool_size);
     cs = new ExecutorCompletionService<RowSet>(transformerThreadPool);
     results = new LinkedBlockingQueue<Future<RowSet>>(cxt.conf.trans_result_queue_size);
-    transformers = new LinkedBlockingQueue<Transformer>(cxt.conf.trans_result_queue_size * 2);
+    transformers = new LinkedBlockingQueue<Transformer>(cxt.conf.trans_result_queue_size);
   }
 
   /**
@@ -80,7 +80,8 @@ public class Dispatcher implements Callable<Long> {
         dispatch(changeSet);
       }
     } catch (BiremeException e) {
-      logger.fatal("Dispatcher exit on error: " + e.getMessage());
+      logger.fatal("Dispatcher exit on error.");
+      logger.fatal("Stack Trace: ", e);
       throw e;
     } finally {
       transformerThreadPool.shutdown();
@@ -92,7 +93,7 @@ public class Dispatcher implements Callable<Long> {
 
   private void dispatch(ChangeSet changeSet) throws BiremeException, InterruptedException {
     Transformer transformer = changeSet.provider.borrowTransformer(changeSet);
-    transformers.put(transformer);
+    transformers.offer(transformer);
     Future<RowSet> result = cs.submit(transformer);
     boolean success;
 
@@ -117,7 +118,7 @@ public class Dispatcher implements Callable<Long> {
         try {
           rowSet = head.get();
         } catch (ExecutionException e) {
-          throw new BiremeException(e.getCause());
+          throw new BiremeException("Transform failed.\n", e.getCause());
         }
 
         insertRowSet(rowSet);
@@ -127,24 +128,17 @@ public class Dispatcher implements Callable<Long> {
     }
   }
 
-  private void insertRowSet(RowSet rowSet) throws InterruptedException, BiremeException {
+  private void insertRowSet(RowSet rowSet) throws BiremeException, InterruptedException {
     HashMap<String, ArrayList<Row>> bucket = rowSet.rowBucket;
     ConcurrentHashMap<String, RowCache> tableCache = cxt.tableRowCache;
 
-    try {
-      for (Entry<String, ArrayList<Row>> entry : bucket.entrySet()) {
-        String fullTableName = entry.getKey();
-        ArrayList<Row> rows = entry.getValue();
-        RowCache cache = tableCache.get(fullTableName);
-        cache.addRows(rows, rowSet.callback);
-        cxt.idleRowArrays.returnObject(rows);
-      }
-    } catch (InterruptedException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new BiremeException(e);
+    for (Entry<String, ArrayList<Row>> entry : bucket.entrySet()) {
+      String fullTableName = entry.getKey();
+      ArrayList<Row> rows = entry.getValue();
+      RowCache cache = tableCache.get(fullTableName);
+      cache.addRows(rows, rowSet.callback);
+      cxt.idleRowArrays.returnObject(rows);
     }
-
     cxt.idleRowSets.returnObject(rowSet);
   }
 }

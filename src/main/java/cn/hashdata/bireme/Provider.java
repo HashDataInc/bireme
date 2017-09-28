@@ -128,6 +128,8 @@ public abstract class Provider implements Callable<Long> {
     /**
      * Borrow an empty {@code RowSet} and write the data acquired from {@code ChangeSet} to the
      * {@code RowSet}. Finally, return the filled {@code RowSet}.
+     *
+     * @throws BiremeException when unable to transform the recoed
      */
     @Override
     public RowSet call() throws BiremeException {
@@ -157,17 +159,21 @@ public abstract class Provider implements Callable<Long> {
      * @param oldValue only for update operation when primary key was updated, we need to get the
      *        old key and delete the old tuple
      * @return the csv tuple in string
+     * @throws BiremeException when can not get the field value
      */
-    protected String formatColumns(
-        Record record, Table table, ArrayList<Integer> columns, boolean oldValue) {
+    protected String formatColumns(Record record, Table table, ArrayList<Integer> columns,
+        boolean oldValue) throws BiremeException {
       tupleStringBuilder.setLength(0);
 
       for (int i = 0; i < columns.size(); ++i) {
         int columnIndex = columns.get(i);
+        int sqlType = table.columnType.get(columnIndex);
         String columnName = table.columnName.get(columnIndex);
-        String data = record.getField(columnName, oldValue);
+        String data = null;
 
-        switch (table.columnType.get(columnIndex)) {
+        data = record.getField(columnName, oldValue);
+
+        switch (sqlType) {
           case Types.CHAR:
           case Types.NCHAR:
           case Types.VARCHAR:
@@ -204,6 +210,17 @@ public abstract class Provider implements Callable<Long> {
             break;
           }
 
+          case Types.DATE:
+          case Types.TIME:
+          case Types.TIMESTAMP: {
+            if (data != null) {
+              int precision = table.columnScale.get(columnIndex);
+              String time = decodeToTime(data, sqlType, precision);
+              tupleStringBuilder.append(time);
+            }
+            break;
+          }
+
           default: {
             if (data != null) {
               tupleStringBuilder.append(data);
@@ -231,18 +248,31 @@ public abstract class Provider implements Callable<Long> {
     protected abstract byte[] decodeToBinary(String data);
 
     /**
-     * For bit type, {@code Transformer} need to decode the extracted string and decode it to
-     * origin bit.
+     * For bit type, {@code Transformer} need to decode the extracted string and decode it to origin
+     * bit.
      *
      * @param data the encoded string
      * @param precision the length of the bit field, acquired from the table's metadata
-     * @return the  string of 1 or 0
+     * @return the string of 1 or 0
      */
-
     protected abstract String decodeToBit(String data, int precision);
 
     /**
+     * For Date/Time type, {@code Transformer} need to decode the extracted string and decode it to
+     * origin Date/Time string.
+     *
+     * @param data the encoded string from provider
+     * @param sqlType concrete type of this field, such as Time, Date
+     * @param precision specifies the number of fractional digits retained in the seconds field
+     * @return the Date/Time format
+     */
+    protected String decodeToTime(String data, int sqlType, int precision) {
+      return data;
+    };
+
+    /**
      * Add escape character to a data string.
+     *
      * @param data the origin string
      * @return the modified string
      */

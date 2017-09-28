@@ -33,7 +33,7 @@ public class Row {
    */
   public static class RowFactory extends BasePooledObjectFactory<Row> {
     @Override
-    public Row create() throws Exception {
+    public Row create() {
       return new Row();
     }
 

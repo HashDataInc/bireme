@@ -70,7 +70,8 @@ public class TaskGenerator implements Callable<Long> {
       }
 
     } catch (BiremeException e) {
-      logger.fatal("TaskGenerator exit on error: " + e.getMessage());
+      logger.fatal("TaskGenerator exit on error.");
+      logger.fatal("Stack Trace: ", e);
       throw e;
     } finally {
       threadPool.shutdown();
@@ -80,7 +81,7 @@ public class TaskGenerator implements Callable<Long> {
     return 0L;
   }
 
-  private void generateMergeTask() throws InterruptedException, BiremeException {
+  private void generateMergeTask() throws BiremeException, InterruptedException {
     Future<LoadTask> task;
 
     for (Entry<String, RowCache> entry : tableCache.entrySet()) {
