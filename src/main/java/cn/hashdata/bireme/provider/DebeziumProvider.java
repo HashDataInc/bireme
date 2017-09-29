@@ -198,6 +198,12 @@ public class DebeziumProvider extends KafkaProvider {
       switch (fieldType) {
         case Types.TIME:
         case Types.TIMESTAMP: {
+          // For TIMETZ and TIMESTAMPTZ, debezium will send the right format which can be load
+          // directly.
+          if (data.contains(String.valueOf('Z'))) {
+            return data;
+          }
+
           int sec = Integer.parseInt(data.substring(0, data.length() - 9));
           String fraction = data.substring(data.length() - 9, data.length() - 9 + precision);
           Date d = new Date(sec * 1000L);
