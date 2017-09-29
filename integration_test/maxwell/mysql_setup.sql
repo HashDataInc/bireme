@@ -1,7 +1,8 @@
 CREATE TABLE numericsource (
     id INTEGER NOT NULL PRIMARY KEY,
     alpha BIGINT,
-    beta REAL
+    beta REAL,
+    gamma NUMERIC(5,2)
 );
 
 CREATE TABLE charsource (
@@ -25,11 +26,11 @@ CREATE TABLE binarysource (
 );
 
 INSERT INTO numericsource 
-VALUES (1, -9223372036854775808, -123.456),
-       (2, 9223372036854775807, 12.345),
-       (3, 100, null),
-       (4, 100, 100),
-       (5, 100, 100);
+VALUES (1, -9223372036854775808, -123.456, 10.1),
+       (2, 9223372036854775807, 12.345, 10),
+       (3, 100, null, 10.0),
+       (4, 100, 100, 10.01),
+       (5, 100, 100, null);
 
 INSERT INTO charsource
 VALUES (1, 'rocks', 'hashdata', 'Bireme is an incremental synchronization tool for the Greenplum / HashData data warehouse'),

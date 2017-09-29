@@ -4,6 +4,8 @@
 
 package cn.hashdata.bireme.provider;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.Types;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -228,6 +230,14 @@ public class DebeziumProvider extends KafkaProvider {
       }
 
       return sb.toString();
+    }
+
+    @Override
+    protected String decodeToNumeric(String data, int fieldType, int precision) {
+      byte[] value = Base64.decodeBase64(data);
+      BigDecimal bigDecimal = new BigDecimal(new BigInteger(value), precision);
+      
+      return bigDecimal.toString();
     }
   }
 }

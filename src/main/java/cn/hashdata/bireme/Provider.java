@@ -172,65 +172,65 @@ public abstract class Provider implements Callable<Long> {
         String data = null;
 
         data = record.getField(columnName, oldValue);
-
-        switch (sqlType) {
-          case Types.CHAR:
-          case Types.NCHAR:
-          case Types.VARCHAR:
-          case Types.LONGVARCHAR:
-          case Types.NVARCHAR:
-          case Types.LONGNVARCHAR: {
-            if (data != null) {
+        if (data != null) {
+          switch (sqlType) {
+            case Types.CHAR:
+            case Types.NCHAR:
+            case Types.VARCHAR:
+            case Types.LONGVARCHAR:
+            case Types.NVARCHAR:
+            case Types.LONGNVARCHAR: {
               tupleStringBuilder.append(QUOTE);
               tupleStringBuilder.append(escapeString(data));
               tupleStringBuilder.append(QUOTE);
-            }
-            break;
-          }
 
-          case Types.BINARY:
-          case Types.BLOB:
-          case Types.CLOB:
-          case Types.LONGVARBINARY:
-          case Types.NCLOB:
-          case Types.VARBINARY: {
-            if (data != null) {
+              break;
+            }
+
+            case Types.BINARY:
+            case Types.BLOB:
+            case Types.CLOB:
+            case Types.LONGVARBINARY:
+            case Types.NCLOB:
+            case Types.VARBINARY: {
               byte[] decoded = null;
               decoded = decodeToBinary(data);
               tupleStringBuilder.append(escapeBinary(decoded));
+              break;
             }
-            break;
-          }
 
-          case Types.BIT: {
-            if (data != null) {
+            case Types.BIT: {
               int precision = table.columnPrecision.get(columnIndex);
               tupleStringBuilder.append(decodeToBit(data, precision));
+              break;
             }
-            break;
-          }
 
-          case Types.DATE:
-          case Types.TIME:
-          case Types.TIMESTAMP: {
-            if (data != null) {
-              int precision = table.columnScale.get(columnIndex);
-              String time = decodeToTime(data, sqlType, precision);
+            case Types.DATE:
+            case Types.TIME:
+            case Types.TIMESTAMP: {
+              int scale = table.columnScale.get(columnIndex);
+              String time = decodeToTime(data, sqlType, scale);
               tupleStringBuilder.append(time);
+              break;
             }
-            break;
-          }
 
-          default: {
-            if (data != null) {
+            case Types.DECIMAL:
+            case Types.NUMERIC: {
+              int scale = table.columnScale.get(columnIndex);
+              String numeric = decodeToNumeric(data, sqlType, scale);
+              tupleStringBuilder.append(numeric);
+              break;
+            }
+
+            default: {
               tupleStringBuilder.append(data);
+              break;
             }
-            break;
           }
-        }
 
-        if (i + 1 < columns.size()) {
-          tupleStringBuilder.append(FIELD_DELIMITER);
+          if (i + 1 < columns.size()) {
+            tupleStringBuilder.append(FIELD_DELIMITER);
+          }
         }
       }
       tupleStringBuilder.append(NEWLINE);
@@ -239,7 +239,7 @@ public abstract class Provider implements Callable<Long> {
     }
 
     /**
-     * For binary type, {@code Transformer} need to decode the extracted string and decode it to
+     * For binary type, {@code Transformer} need to decode the extracted string and transform it to
      * origin binary.
      *
      * @param data the encoded string
@@ -248,8 +248,8 @@ public abstract class Provider implements Callable<Long> {
     protected abstract byte[] decodeToBinary(String data);
 
     /**
-     * For bit type, {@code Transformer} need to decode the extracted string and decode it to origin
-     * bit.
+     * For bit type, {@code Transformer} need to decode the extracted string and transform it to
+     * origin bit.
      *
      * @param data the encoded string
      * @param precision the length of the bit field, acquired from the table's metadata
@@ -258,15 +258,28 @@ public abstract class Provider implements Callable<Long> {
     protected abstract String decodeToBit(String data, int precision);
 
     /**
-     * For Date/Time type, {@code Transformer} need to decode the extracted string and decode it to
-     * origin Date/Time string.
+     * For Date/Time type, {@code Transformer} need to decode the extracted string and transform it
+     * to origin Date/Time string.
      *
      * @param data the encoded string from provider
-     * @param sqlType concrete type of this field, such as Time, Date
+     * @param sqlType particular type of this field, such as Time, Date
      * @param precision specifies the number of fractional digits retained in the seconds field
      * @return the Date/Time format
      */
     protected String decodeToTime(String data, int sqlType, int precision) {
+      return data;
+    };
+
+    /**
+     * For Numeric type, {@code Transformer} need to decode the extracted string and transform it to
+     * origin Numeric in String.
+     * 
+     * @param data the value from provider
+     * @param sqlType particular type of this field
+     * @param precision the count of decimal digits in the fractional part
+     * @return the numeric number in String
+     */
+    protected String decodeToNumeric(String data, int sqlType, int precision) {
       return data;
     };
 
