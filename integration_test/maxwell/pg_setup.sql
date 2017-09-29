@@ -1,7 +1,8 @@
 CREATE TABLE numerictarget (
     id INTEGER NOT NULL PRIMARY KEY,
     alpha BIGINT,
-    beta REAL
+    beta REAL,
+    gamma NUMERIC(5,2)
 );
 
 CREATE TABLE chartarget (
