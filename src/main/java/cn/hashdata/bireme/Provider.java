@@ -227,11 +227,11 @@ public abstract class Provider implements Callable<Long> {
               break;
             }
           }
-
-          if (i + 1 < columns.size()) {
-            tupleStringBuilder.append(FIELD_DELIMITER);
-          }
         }
+        if (i + 1 < columns.size()) {
+          tupleStringBuilder.append(FIELD_DELIMITER);
+        }
+
       }
       tupleStringBuilder.append(NEWLINE);
 
@@ -273,7 +273,7 @@ public abstract class Provider implements Callable<Long> {
     /**
      * For Numeric type, {@code Transformer} need to decode the extracted string and transform it to
      * origin Numeric in String.
-     * 
+     *
      * @param data the value from provider
      * @param sqlType particular type of this field
      * @param precision the count of decimal digits in the fractional part
