@@ -53,7 +53,7 @@ public class ChangeLoader implements Callable<Long> {
   protected Connection conn;
   protected LinkedBlockingQueue<Future<LoadTask>> taskIn;
   protected Table table;
-  protected LoadStatus status;
+  protected LoadState state;
   protected LoadTask currentTask;
   ExecutorService threadPool;
   private String mappedTable;
@@ -73,7 +73,7 @@ public class ChangeLoader implements Callable<Long> {
     this.cxt = cxt;
     this.conf = cxt.conf;
     this.conn = null;
-    this.status = null;
+    this.state = null;
     this.mappedTable = mappedTable;
     this.table = cxt.tablesInfo.get(mappedTable);
     taskIn = new LinkedBlockingQueue<Future<LoadTask>>(conf.loader_task_queue_size);
@@ -264,8 +264,8 @@ public class ChangeLoader implements Callable<Long> {
       }
     }
 
-    currentTask.loadStatus.setCompleteTime(new Date().getTime());
-    status = currentTask.loadStatus;
+    currentTask.loadState.setCompleteTime(new Date().getTime());
+    state = currentTask.loadState;
 
     for (CommitCallback callback : currentTask.callbacks) {
       callback.done();

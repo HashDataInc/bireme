@@ -2,12 +2,12 @@ package cn.hashdata.bireme;
 
 import java.util.HashMap;
 
-public class LoadStatus {
+public class LoadState {
   public HashMap<String, Long> produceTime;
   public Long receiveTime = Long.MAX_VALUE;
   public Long completeTime;
 
-  public LoadStatus() {
+  public LoadState() {
     produceTime = new HashMap<String, Long>();
   }
 

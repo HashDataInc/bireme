@@ -171,10 +171,10 @@ public class RowCache {
       Thread.currentThread().setName("RowBatchMerger");
 
       LoadTask task = new LoadTask(mappedTableName);
-      LoadStatus status = task.loadStatus;
+      LoadState state = task.loadState;
 
       for (Row row : rows) {
-        status.setProduceTime(row.originTable, row.produceTime);
+        state.setProduceTime(row.originTable, row.produceTime);
 
         switch (row.type) {
           case INSERT:
@@ -208,7 +208,7 @@ public class RowCache {
 
       task.callbacks = callbacks;
       for (CommitCallback callback : callbacks) {
-        status.setReceiveTime(callback.getReceiveTime());
+        state.setReceiveTime(callback.getReceiveTime());
       }
 
       return task;

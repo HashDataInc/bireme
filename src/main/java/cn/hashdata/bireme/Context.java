@@ -68,6 +68,8 @@ public class Context {
   public int exitLoaders;
   public WatchDog watchDog;
 
+  public StateServer server;
+
   static class WatchDog extends Thread {
     private DaemonController controller;
     private Context cxt;
@@ -119,6 +121,8 @@ public class Context {
     this.changeLoaders = new HashMap<String, ChangeLoader>();
     this.loaderConnections = new LinkedBlockingQueue<Connection>(conf.loader_conn_size);
     this.temporaryTables = new HashMap<Connection, HashSet<String>>();
+
+    this.server = new StateServer(this, 8080);
 
     exitLoaders = 0;
 
