@@ -196,11 +196,24 @@ public class DebeziumProvider extends KafkaProvider {
       StringBuilder sb = new StringBuilder();
 
       switch (fieldType) {
-        case Types.TIME: {
+        case Types.TIME:
+        case Types.TIMESTAMP: {
+          // For TIMETZ and TIMESTAMPTZ, debezium will send the right format which can be load
+          // directly.
+          if (data.contains(String.valueOf('Z'))) {
+            return data;
+          }
+
           int sec = Integer.parseInt(data.substring(0, data.length() - 9));
           String fraction = data.substring(data.length() - 9, data.length() - 9 + precision);
           Date d = new Date(sec * 1000L);
-          SimpleDateFormat df = new SimpleDateFormat("HH:mm:ss");
+
+          SimpleDateFormat df;
+          if (fieldType == Types.TIME) {
+            df = new SimpleDateFormat("HH:mm:ss");
+          } else {
+            df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+          }
           df.setTimeZone(TimeZone.getTimeZone("GMT"));
 
           sb.append(df.format(d));
@@ -236,7 +249,7 @@ public class DebeziumProvider extends KafkaProvider {
     protected String decodeToNumeric(String data, int fieldType, int precision) {
       byte[] value = Base64.decodeBase64(data);
       BigDecimal bigDecimal = new BigDecimal(new BigInteger(value), precision);
-      
+
       return bigDecimal.toString();
     }
   }

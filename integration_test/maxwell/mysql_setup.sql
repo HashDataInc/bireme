@@ -15,7 +15,8 @@ CREATE TABLE charsource (
 CREATE TABLE timesource (
     id INTEGER NOT NULL PRIMARY KEY,
     alpha DATE,
-    beta TIME(3)
+    beta TIME(3),
+    gamma TIMESTAMP(6)
 );
 
 CREATE TABLE binarysource (
@@ -39,8 +40,8 @@ new line'),
        (3, 'abcde', '', '');
 
 INSERT INTO timesource
-VALUES (1, '2017-09-18', '10:29:00'),
-       (2, '2017-09-18', '10:29:00.123');
+VALUES (1, '2017-09-18', '10:29:00', '2017-09-29 15:00:00.0'),
+       (2, '2017-09-18', '10:29:00.123', '2017-09-29 15:00:00.0123');
 
 INSERT INTO binarysource
 VALUES (1, X'1A1B1C3D1F', false, B'110000011101100'),

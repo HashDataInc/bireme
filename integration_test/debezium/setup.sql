@@ -15,7 +15,9 @@ CREATE TABLE charsource (
 CREATE TABLE timesource (
     id INTEGER NOT NULL PRIMARY KEY,
     "alphA" DATE,
-    beta TIME(3)
+    beta TIME(3),
+    gamma TIMESTAMP(3),
+    delta TIMESTAMPTZ(3)
 );
 
 CREATE TABLE binarysource (
@@ -39,8 +41,8 @@ new line'),
        (3, 'abcde', '', '');
 
 INSERT INTO timesource
-VALUES (1, '2017-09-18', '10:29:00'),
-       (2, '2017-09-18', '10:29:00.123');
+VALUES (1, '2017-09-18', '10:29:00', '2017-09-29 15:00:00.0', '2017-09-29 15:00:00.0'),
+       (2, '2017-09-18', '10:29:00.123', '2017-09-29 15:00:00.012', '2017-09-29 15:00:00.012');
 
 INSERT INTO binarysource
 VALUES (1, decode('1A1B1C3D1F', 'hex'), true, B'110000011101100'),
@@ -75,7 +77,9 @@ CREATE TABLE chartarget (
 CREATE TABLE timetarget (
     id INTEGER NOT NULL PRIMARY KEY,
     alpha DATE,
-    beta TIME(5)
+    beta TIME(5),
+    gamma TIMESTAMP(3),
+    delta TIMESTAMPTZ(3)
 );
 
 CREATE TABLE binarytarget (

@@ -15,7 +15,8 @@ CREATE TABLE chartarget (
 CREATE TABLE timetarget (
     id INTEGER NOT NULL PRIMARY KEY,
     alpha DATE,
-    beta TIME(5)
+    beta TIME(5),
+    gamma TIMESTAMP(6)
 );
 
 CREATE TABLE binarytarget (
