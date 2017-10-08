@@ -16,15 +16,30 @@ import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.Request;
 
+/**
+ * {@code StateServer} is a simple http server to get the load status via http protocol.
+ *
+ * @author yuze
+ *
+ */
 public class StateServer {
   public Context cxt;
   public Server server;
 
+  /**
+   * Create a StateServer
+   *
+   * @param cxt the Bireme Context
+   * @param port the binded port of the server
+   */
   public StateServer(Context cxt, int port) {
     this.cxt = cxt;
     this.server = new Server(port);
   }
 
+  /**
+   * Start the http server.
+   */
   public void start() {
     ContextHandlerCollection contexts = new ContextHandlerCollection();
 
@@ -46,6 +61,9 @@ public class StateServer {
     }
   }
 
+  /**
+   * Stop the http server.
+   */
   public void stop() {
     try {
       server.stop();
@@ -53,6 +71,12 @@ public class StateServer {
     }
   }
 
+  /**
+   * The Handler for StateServer.
+   *
+   * @author yuze
+   *
+   */
   class StateHandler extends AbstractHandler {
     final String table;
     StringBuilder outPut;
