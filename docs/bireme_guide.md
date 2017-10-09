@@ -1,6 +1,6 @@
 # Getting Started Guide
 
-In this section, we will demonstrate how to use bireme to synchronize MySQL with a table named *demo.test* to *public.test* in GreenPlum database. Before the start, users need to deploy MySQL, Kafka and GreenPlum.
+In this section, we will demonstrate how to use bireme to synchronize a table named *demo.test* in MySQL to another table named *public.test* in GreenPlum database. Before we start, users need to deploy MySQL, Kafka and GreenPlum.
 
 **Note:** All tables must contain primary key.
 
@@ -8,7 +8,7 @@ In this section, we will demonstrate how to use bireme to synchronize MySQL with
 
 ## 1.1 MySQL configuration
 
-Maxwell can only operate if row-based replication is on.
+Maxwell can only operate when row-based replication is on.
 
 ```
 $ vi my.cnf
@@ -19,7 +19,7 @@ log-bin=master
 binlog_format=row
 ```
 
-Create maxwell user and grant it authority
+Create maxwell user and grant it authority.
 
 ```
 mysql> GRANT ALL on maxwell.* to 'maxwell'@'%' identified by 'XXXXXX';
@@ -63,7 +63,7 @@ Use `--host` option and `--kafka.bootstrap.servers` option to designate MySQL ho
 
 ### 2.1 Edit etc/config.properties
 
-Config connection infomation to the target database, as well as data source information.
+Specify connection infomation to the target database, as well as data source information.
 
 ```
 target.url = jdbc:postgresql://gpdbhost:5432/XXXXXX
@@ -93,12 +93,12 @@ bin/bireme start
 
 When you get the message *The bireme has started*, bireme has successfully started. Then you could insert data in MySQL and it will be synced to GreenPlum.
 
-If you need to stop
+If you need to stop, execute the following.
 
 ```
 bin/bireme stop
 ```
 
-log files are located in *logs* directory
+Log files are located in *logs* directory.
 
 
