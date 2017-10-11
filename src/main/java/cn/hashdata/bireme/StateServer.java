@@ -129,11 +129,14 @@ public class StateServer {
       }
 
       for (Entry<String, Long> iter : state.produceTime.entrySet()) {
-        outPut.append("Source Table: " + iter.getKey()
-            + " Produce Time: " + sf.format(new Date(iter.getValue())) + "\n");
+        outPut.append("Source Table: " + iter.getKey() + " Produce Time: "
+            + sf.format(new Date(iter.getValue())) + "\n");
       }
 
-      outPut.append("Receive Time: " + sf.format(new Date(state.receiveTime)) + "\n");
+      for (Entry<String, Long> iter : state.receiveTime.entrySet()) {
+        outPut.append("Source Table: " + iter.getKey() + " Produce Time: "
+            + sf.format(new Date(iter.getValue())) + "\n");
+      }
       outPut.append("Complete Time: " + sf.format(new Date(state.completeTime)) + "\n");
     }
   }

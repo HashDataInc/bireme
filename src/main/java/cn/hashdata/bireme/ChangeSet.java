@@ -4,6 +4,8 @@
 
 package cn.hashdata.bireme;
 
+import java.util.Date;
+
 import org.apache.commons.pool2.BasePooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
@@ -16,6 +18,7 @@ import org.apache.commons.pool2.impl.DefaultPooledObject;
  */
 public class ChangeSet {
   public Provider provider;
+  public Date createdAt;
   public Object changes;
   public CommitCallback callback;
 

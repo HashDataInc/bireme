@@ -57,10 +57,4 @@ public interface CommitCallback {
    * Commit this callback.
    */
   public void commit();
-
-  /**
-   * Get the time when Bireme receive this ChangeSet
-   * @return the time
-   */
-  public Long getReceiveTime();
 }

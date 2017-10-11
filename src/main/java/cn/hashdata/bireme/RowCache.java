@@ -175,6 +175,7 @@ public class RowCache {
 
       for (Row row : rows) {
         state.setProduceTime(row.originTable, row.produceTime);
+        state.setReceiveTime(row.originTable, row.receiveTime);
 
         switch (row.type) {
           case INSERT:
@@ -207,9 +208,6 @@ public class RowCache {
       cxt.idleRowArrays.returnObject(rows);
 
       task.callbacks = callbacks;
-      for (CommitCallback callback : callbacks) {
-        state.setReceiveTime(callback.getReceiveTime());
-      }
 
       return task;
     }

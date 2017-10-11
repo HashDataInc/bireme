@@ -18,11 +18,12 @@ import java.util.HashMap;
  */
 public class LoadState {
   public HashMap<String, Long> produceTime;
-  public Long receiveTime = Long.MAX_VALUE;
+  public HashMap<String, Long> receiveTime;
   public Long completeTime;
 
   public LoadState() {
     produceTime = new HashMap<String, Long>();
+    receiveTime = new HashMap<String, Long>();
   }
 
   /**
@@ -30,8 +31,8 @@ public class LoadState {
    *
    * @param time Unix time
    */
-  public void setReceiveTime(Long time) {
-    receiveTime = time < receiveTime ? time : receiveTime;
+  public void setReceiveTime(String table, Long time) {
+    receiveTime.put(table, time);
   }
 
   /**
@@ -58,8 +59,8 @@ public class LoadState {
    *
    * @return Unix time
    */
-  public Long getReceiveTime() {
-    return receiveTime;
+  public Long getReceiveTime(String table) {
+    return receiveTime.get(table);
   }
 
   /**
