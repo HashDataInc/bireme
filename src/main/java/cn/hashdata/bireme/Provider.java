@@ -231,7 +231,6 @@ public abstract class Provider implements Callable<Long> {
         if (i + 1 < columns.size()) {
           tupleStringBuilder.append(FIELD_DELIMITER);
         }
-
       }
       tupleStringBuilder.append(NEWLINE);
 

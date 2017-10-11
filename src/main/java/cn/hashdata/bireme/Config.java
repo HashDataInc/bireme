@@ -194,6 +194,7 @@ public class Config {
     debeziumConf.name = prefix;
     debeziumConf.server = subConfig.getString("kafka.server");
     debeziumConf.topic = prefix;
+    debeziumConf.groupID = subConfig.getString("kafka.groupid", "bireme");
 
     if (debeziumConf.server == null) {
       String message = "Please designate server for " + prefix + ".";
@@ -218,6 +219,7 @@ public class Config {
     maxwellConf.name = prefix;
     maxwellConf.server = subConfig.getString("kafka.server");
     maxwellConf.topic = subConfig.getString("kafka.topic");
+    maxwellConf.groupID = subConfig.getString("kafka.groupid", "bireme");
 
     if (maxwellConf.server == null) {
       String message = "Please designate server for " + prefix + ".";

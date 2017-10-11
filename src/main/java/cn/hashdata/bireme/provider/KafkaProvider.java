@@ -39,6 +39,7 @@ public abstract class KafkaProvider extends Provider {
   public static class KafkaProviderConfig extends ProviderConfig {
     public String topic;
     public String server;
+    public String groupID;
   }
 
   public KafkaProviderConfig providerConfig;
@@ -83,7 +84,7 @@ public abstract class KafkaProvider extends Provider {
     Properties props = new Properties();
     props.put("bootstrap.servers", providerConfig.server);
     props.put("group.id", "bireme");
-    props.put("enable.auto.commit", false);
+    props.put("enable.auto.commit", providerConfig.groupID);
     props.put("session.timeout.ms", 30000);
     props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
     props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
