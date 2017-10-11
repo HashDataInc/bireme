@@ -87,6 +87,12 @@ public class LoadState {
     return produceTime.get(table);
   }
 
+  /**
+   * Reorganized the State into an object that is convenient to form a Json String.
+   * 
+   * @param targetTable the target Table
+   * @return A State object
+   */
   public State toJson(String targetTable) {
     State srcState = new State(targetTable, new Date(completeTime));
 
@@ -115,6 +121,13 @@ public class LoadState {
     Date produce_time;
     Date receive_time;
   }
+
+  /**
+   * State is a class which is convenient to form a Json String.
+   * 
+   * @author yuze
+   *
+   */
   public class State {
     String target_table;
     ArrayList<Source> sources;
