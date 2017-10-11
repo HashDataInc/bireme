@@ -9,7 +9,7 @@ import java.util.HashMap;
  * <li><B> produceTime </B> The time when Change Data Capture (CDC) produced the record. For each
  * origin table, LoadState documents the latest produceTime in the corresponding LoadTask.</li>
  * <li><B> receiveTime </B> The time when Bireme received the record. LoadState documents the
- * earliest receiveTime in the corresponding LoadTask.</li>
+ * earliest receiveTime for each origin table in the corresponding LoadTask.</li>
  * <li><B> completeTime </B> The time when ChangeLoader successfully loaded the LoadTask.</li>
  * </ul>
  *
@@ -27,8 +27,9 @@ public class LoadState {
   }
 
   /**
-   * Update the receiveTime, it document the earliest time.
+   * Set the receiveTime for each origin table.
    *
+   * @param table the name of origin table
    * @param time Unix time
    */
   public void setReceiveTime(String table, Long time) {
@@ -55,9 +56,10 @@ public class LoadState {
   }
 
   /**
-   * Get the receiveTime.
-   *
-   * @return Unix time
+   * Get the receiveTime for a specific table
+   * 
+   * @param table the name of origin table
+   * @return UnixTime
    */
   public Long getReceiveTime(String table) {
     return receiveTime.get(table);

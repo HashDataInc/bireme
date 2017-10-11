@@ -86,10 +86,18 @@ public class StateServer {
   class StateHandler extends AbstractHandler {
     final String table;
 
+    /**
+     * Create a new StateHandler
+     */
     public StateHandler() {
       this.table = null;
     }
 
+    /**
+     * Create a new StateHandler
+     * 
+     * @param table set the target table for this handler
+     */
     public StateHandler(String table) {
       this.table = table;
     }
@@ -107,6 +115,12 @@ public class StateServer {
       baseRequest.setHandled(true);
     }
 
+    /**
+     * Get the State.
+     * 
+     * @param format if not null, format the output string in a pretty style
+     * @return the state
+     */
     public String fetchState(String format) {
       String result;
       Gson gson = null;
