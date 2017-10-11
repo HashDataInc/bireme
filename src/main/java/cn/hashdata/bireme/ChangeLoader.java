@@ -53,9 +53,10 @@ public class ChangeLoader implements Callable<Long> {
   protected Connection conn;
   protected LinkedBlockingQueue<Future<LoadTask>> taskIn;
   protected Table table;
-  protected LoadState state;
   protected LoadTask currentTask;
   ExecutorService threadPool;
+
+  private LoadState state;
   private String mappedTable;
 
   private Timer copyForDeleteTimer;
@@ -143,6 +144,14 @@ public class ChangeLoader implements Callable<Long> {
 
     logger.info("Loader exit, corresponding table {}.", mappedTable);
     return 0L;
+  }
+
+  public synchronized LoadState getLoadState() {
+    return this.state;
+  }
+
+  private synchronized void setLoadState(LoadState state) {
+    this.state = state;
   }
 
   /**
@@ -265,7 +274,7 @@ public class ChangeLoader implements Callable<Long> {
     }
 
     currentTask.loadState.setCompleteTime(new Date().getTime());
-    state = currentTask.loadState;
+    setLoadState(currentTask.loadState);
 
     for (CommitCallback callback : currentTask.callbacks) {
       callback.done();

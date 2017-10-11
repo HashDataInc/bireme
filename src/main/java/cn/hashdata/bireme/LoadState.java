@@ -57,7 +57,7 @@ public class LoadState {
 
   /**
    * Get the receiveTime for a specific table
-   * 
+   *
    * @param table the name of origin table
    * @return UnixTime
    */

@@ -203,7 +203,7 @@ public abstract class KafkaProvider extends Provider {
           cxt.idleRows.returnObject(row);
           continue;
         }
-        
+
         row.receiveTime = changeSet.createdAt.getTime();
         addToRowSet(row, rowSet);
         offsets.put(new TopicPartition(change.topic(), change.partition()), change.offset());

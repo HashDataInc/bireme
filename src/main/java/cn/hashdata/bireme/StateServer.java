@@ -95,7 +95,7 @@ public class StateServer {
 
     /**
      * Create a new StateHandler
-     * 
+     *
      * @param table set the target table for this handler
      */
     public StateHandler(String table) {
@@ -117,7 +117,7 @@ public class StateServer {
 
     /**
      * Get the State.
-     * 
+     *
      * @param format if not null, format the output string in a pretty style
      * @return the state
      */
@@ -147,13 +147,14 @@ public class StateServer {
 
     private JsonObject getTableState(String table) {
       SimpleDateFormat sf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-      LoadState state = cxt.changeLoaders.get(table).state;
+      ChangeLoader loader = cxt.changeLoaders.get(table);
+      LoadState state = loader.getLoadState();
+
       JsonObject jsonFormat = new JsonObject();
 
       jsonFormat.addProperty("target_table", table);
 
       if (state == null) {
-        jsonFormat.addProperty("State", "Haven't load any task!");
         return jsonFormat;
       }
 
