@@ -1,6 +1,9 @@
 package cn.hashdata.bireme;
 
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.Map.Entry;
 
 /**
  * {@code LoadState} document current state for {@code ChangeLoader}. It is in connection with
@@ -82,5 +85,45 @@ public class LoadState {
    */
   public Long getProduceTime(String table) {
     return produceTime.get(table);
+  }
+
+  public State toJson(String targetTable) {
+    State srcState = new State(targetTable, new Date(completeTime));
+
+    for (Entry<String, Long> iter : produceTime.entrySet()) {
+      Source src = new Source();
+      String originTable = iter.getKey();
+      Long produceTime = iter.getValue();
+      Long receiveTime = getReceiveTime(originTable);
+
+      String[] split = iter.getKey().split("\\.", 2);
+
+      src.source = split[0];
+      src.table_name = split[1];
+      src.produce_time = new Date(produceTime);
+      src.receive_time = new Date(receiveTime);
+
+      srcState.sources.add(src);
+    }
+
+    return srcState;
+  }
+
+  class Source {
+    String source;
+    String table_name;
+    Date produce_time;
+    Date receive_time;
+  }
+  public class State {
+    String target_table;
+    ArrayList<Source> sources;
+    Date complete_time;
+
+    public State(String targetTable, Date completeTime) {
+      target_table = targetTable;
+      sources = new ArrayList<Source>();
+      complete_time = completeTime;
+    }
   }
 }

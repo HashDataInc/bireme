@@ -2,9 +2,6 @@ package cn.hashdata.bireme;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Map.Entry;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -17,8 +14,8 @@ import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+
+import cn.hashdata.bireme.LoadState.State;
 
 import org.eclipse.jetty.server.Request;
 
@@ -126,59 +123,32 @@ public class StateServer {
       Gson gson = null;
 
       if (format != null) {
-        gson = new GsonBuilder().setPrettyPrinting().create();
+        gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").setPrettyPrinting()
+            .create();
       } else {
-        gson = new Gson();
+        gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").create();
       }
 
       if (table == null) {
-        JsonArray jsonArray = new JsonArray();
+        StringBuilder sb = new StringBuilder();
+
         for (String targetTable : cxt.changeLoaders.keySet()) {
-          jsonArray.add(getTableState(targetTable));
+          sb.append(gson.toJson(getTableState(targetTable), State.class));
         }
-        result = gson.toJson(jsonArray);
+
+        result = sb.toString();
       } else {
-        JsonObject jsonObject = getTableState(table);
-        result = gson.toJson(jsonObject);
+        result = gson.toJson(getTableState(table), State.class);
       }
 
       return result;
     }
 
-    private JsonObject getTableState(String table) {
-      SimpleDateFormat sf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+    private State getTableState(String table) {
       ChangeLoader loader = cxt.changeLoaders.get(table);
       LoadState state = loader.getLoadState();
 
-      JsonObject jsonFormat = new JsonObject();
-
-      jsonFormat.addProperty("target_table", table);
-
-      if (state == null) {
-        return jsonFormat;
-      }
-
-      JsonArray sources = new JsonArray();
-
-      for (Entry<String, Long> iter : state.produceTime.entrySet()) {
-        JsonObject source = new JsonObject();
-        String originTable = iter.getKey();
-        Long produceTime = iter.getValue();
-        Long receiveTime = state.getReceiveTime(originTable);
-
-        String[] split = iter.getKey().split("\\.", 2);
-
-        source.addProperty("source", split[0]);
-        source.addProperty("table_name", split[1]);
-        source.addProperty("produce_time", sf.format(new Date(produceTime)));
-        source.addProperty("receive_time", sf.format(new Date(receiveTime)));
-
-        sources.add(source);
-      }
-
-      jsonFormat.add("sources", sources);
-      jsonFormat.addProperty("complete_time", sf.format(new Date(state.completeTime)));
-      return jsonFormat;
+      return state.toJson(table);
     }
   }
 }
