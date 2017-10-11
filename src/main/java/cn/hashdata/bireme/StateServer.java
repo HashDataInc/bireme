@@ -14,6 +14,12 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+
 import org.eclipse.jetty.server.Request;
 
 /**
@@ -79,16 +85,13 @@ public class StateServer {
    */
   class StateHandler extends AbstractHandler {
     final String table;
-    StringBuilder outPut;
 
     public StateHandler() {
       this.table = null;
-      this.outPut = new StringBuilder();
     }
 
     public StateHandler(String table) {
       this.table = table;
-      this.outPut = new StringBuilder();
     }
 
     @Override
@@ -98,46 +101,69 @@ public class StateServer {
       response.setStatus(HttpServletResponse.SC_OK);
 
       PrintWriter out = response.getWriter();
-
-      out.println(fetchState());
+      String format = request.getParameter("pretty");
+      out.println(fetchState(format));
 
       baseRequest.setHandled(true);
     }
 
-    public String fetchState() {
-      outPut.setLength(0);
-      if (table == null) {
-        for (String targetTable : cxt.changeLoaders.keySet()) {
-          getTableState(targetTable);
-          outPut.append("\n\n");
-        }
-        return outPut.toString();
+    public String fetchState(String format) {
+      String result;
+      Gson gson = null;
+
+      if (format != null) {
+        gson = new GsonBuilder().setPrettyPrinting().create();
       } else {
-        getTableState(table);
-        return outPut.toString();
+        gson = new Gson();
       }
+
+      if (table == null) {
+        JsonArray jsonArray = new JsonArray();
+        for (String targetTable : cxt.changeLoaders.keySet()) {
+          jsonArray.add(getTableState(targetTable));
+        }
+        result = gson.toJson(jsonArray);
+      } else {
+        JsonObject jsonObject = getTableState(table);
+        result = gson.toJson(jsonObject);
+      }
+
+      return result;
     }
 
-    private void getTableState(String table) {
-      outPut.append("Table: " + table + "\n");
-      SimpleDateFormat sf = new SimpleDateFormat("yy-MM-dd HH:mm:ss");
+    private JsonObject getTableState(String table) {
+      SimpleDateFormat sf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
       LoadState state = cxt.changeLoaders.get(table).state;
+      JsonObject jsonFormat = new JsonObject();
+
+      jsonFormat.addProperty("target_table", table);
 
       if (state == null) {
-        outPut.append("haven't load any task.");
-        return;
+        jsonFormat.addProperty("State", "Haven't load any task!");
+        return jsonFormat;
       }
+
+      JsonArray sources = new JsonArray();
 
       for (Entry<String, Long> iter : state.produceTime.entrySet()) {
-        outPut.append("Source Table: " + iter.getKey() + " Produce Time: "
-            + sf.format(new Date(iter.getValue())) + "\n");
+        JsonObject source = new JsonObject();
+        String originTable = iter.getKey();
+        Long produceTime = iter.getValue();
+        Long receiveTime = state.getReceiveTime(originTable);
+
+        String[] split = iter.getKey().split("\\.", 2);
+
+        source.addProperty("source", split[0]);
+        source.addProperty("table_name", split[1]);
+        source.addProperty("produce_time", sf.format(new Date(produceTime)));
+        source.addProperty("receive_time", sf.format(new Date(receiveTime)));
+
+        sources.add(source);
       }
 
-      for (Entry<String, Long> iter : state.receiveTime.entrySet()) {
-        outPut.append("Source Table: " + iter.getKey() + " Produce Time: "
-            + sf.format(new Date(iter.getValue())) + "\n");
-      }
-      outPut.append("Complete Time: " + sf.format(new Date(state.completeTime)) + "\n");
+      jsonFormat.add("sources", sources);
+      jsonFormat.addProperty("complete_time", sf.format(new Date(state.completeTime)));
+      return jsonFormat;
     }
   }
 }
