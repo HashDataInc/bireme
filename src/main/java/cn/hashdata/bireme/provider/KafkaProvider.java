@@ -83,8 +83,8 @@ public abstract class KafkaProvider extends Provider {
   private Properties kafkaProps() {
     Properties props = new Properties();
     props.put("bootstrap.servers", providerConfig.server);
-    props.put("group.id", "bireme");
-    props.put("enable.auto.commit", providerConfig.groupID);
+    props.put("group.id", providerConfig.groupID);
+    props.put("enable.auto.commit", false);
     props.put("session.timeout.ms", 30000);
     props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
     props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
