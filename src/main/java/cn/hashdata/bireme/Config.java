@@ -44,6 +44,7 @@ public class Config {
   public int loader_conn_size;
   public int loader_task_queue_size;
   public int report_interval;
+  public String state_server_addr;
   public int state_server_port;
 
   public ConnectionConfig target;
@@ -87,6 +88,8 @@ public class Config {
   protected void basicConfig() {
     reporter = config.getString("metrics.reporter", "console");
     report_interval = config.getInt("metrics.reporter.console.interval", 15);
+
+    state_server_addr = config.getString("state.server.addr", "0.0.0.0");
     state_server_port = config.getInt("state.server.port", 8080);
 
     transform_pool_size = config.getInt("transform.thread_pool.size", 10);

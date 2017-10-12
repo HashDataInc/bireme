@@ -2,6 +2,9 @@ package cn.hashdata.bireme;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -34,10 +37,16 @@ public class StateServer {
    *
    * @param cxt the Bireme Context
    * @param port the binded port of the server
+   * @throws BiremeException Unknown Host
    */
-  public StateServer(Context cxt, int port) {
+  public StateServer(Context cxt, String addr, int port) throws BiremeException {
     this.cxt = cxt;
-    this.server = new Server(port);
+    try {
+      this.server = new Server(new InetSocketAddress(InetAddress.getByName(addr), port));
+    } catch (UnknownHostException e) {
+      String message = "Unknown Host";
+      throw new BiremeException(message, e);
+    }
   }
 
   /**
