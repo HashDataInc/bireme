@@ -93,8 +93,8 @@ public class LoadState {
    * @param targetTable the target Table
    * @return A State object
    */
-  public State toJson(String targetTable) {
-    State srcState = new State(targetTable, new Date(completeTime));
+  public PlainState getPlainState(String targetTable) {
+    PlainState srcState = new PlainState(targetTable, new Date(completeTime));
 
     for (Entry<String, Long> iter : produceTime.entrySet()) {
       Source src = new Source();
@@ -115,28 +115,27 @@ public class LoadState {
     return srcState;
   }
 
+  /**
+   * PlainState is a class which is convenient to form a Json String.
+   * 
+   * @author yuze
+   *
+   */
+  public class PlainState {
+    String target_table;
+    ArrayList<Source> sources;
+    Date complete_time;
+
+    public PlainState(String targetTable, Date completeTime) {
+      target_table = targetTable;
+      sources = new ArrayList<Source>();
+      complete_time = completeTime;
+    }
+  }
   class Source {
     String source;
     String table_name;
     Date produce_time;
     Date receive_time;
-  }
-
-  /**
-   * State is a class which is convenient to form a Json String.
-   * 
-   * @author yuze
-   *
-   */
-  public class State {
-    String target_table;
-    ArrayList<Source> sources;
-    Date complete_time;
-
-    public State(String targetTable, Date completeTime) {
-      target_table = targetTable;
-      sources = new ArrayList<Source>();
-      complete_time = completeTime;
-    }
   }
 }

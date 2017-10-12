@@ -15,7 +15,7 @@ import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-import cn.hashdata.bireme.LoadState.State;
+import cn.hashdata.bireme.LoadState.PlainState;
 
 import org.eclipse.jetty.server.Request;
 
@@ -133,22 +133,22 @@ public class StateServer {
         StringBuilder sb = new StringBuilder();
 
         for (String targetTable : cxt.changeLoaders.keySet()) {
-          sb.append(gson.toJson(getTableState(targetTable), State.class));
+          sb.append(gson.toJson(getTableState(targetTable), PlainState.class));
         }
 
         result = sb.toString();
       } else {
-        result = gson.toJson(getTableState(table), State.class);
+        result = gson.toJson(getTableState(table), PlainState.class);
       }
 
       return result;
     }
 
-    private State getTableState(String table) {
+    private PlainState getTableState(String table) {
       ChangeLoader loader = cxt.changeLoaders.get(table);
       LoadState state = loader.getLoadState();
 
-      return state.toJson(table);
+      return state.getPlainState(table);
     }
   }
 }
