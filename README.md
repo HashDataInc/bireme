@@ -96,6 +96,7 @@ The configuration files consist of two parts:
 |merge.interval|Maxmium interval between Merge in milliseconds|10000|
 |merge.batch.size|Maxmium number of Row in one Merge|50000|
 |state.server.port|Port for state server|8080|
+|state.server.addr|IP address for state server|0.0.0.0|
 
 ### 1.4.2 \<source_name\>.properties
 
@@ -111,21 +112,21 @@ In the configuration file for each data source, specify the table which the data
 
 **Load State**
 
-Bireme load a batch of change data at a time, which is called a Task. For each Task, bireme represents its state by Load State. The Load State of recently successfully loaded Task is used to describe the state of corresponding target table.
+Bireme load a batch of change data at a time, which is called a task. For each task, bireme represents its state by Load State. The Load State of recently successfully loaded task is used to describe the state of corresponding target table.
 
 Three kinds of time is used to describe a Load State.
 
 |Time|Description|
 |:---:|:---:|
-|produce time|For a record, produce time is when it entered the Kafka. Bireme record this time for the rocord which is the newest produced one in a Task.|
-|receive time|For a record, receive time is when it is received. Bireme record this time for the record which is the earliest received one in a Task.|
-|complete time|When the Task is successfully loaded into target table.|
+|produce time|For a record, produce time is when it is produced to Kafka. Bireme record this time for the rocord which is the newest produced one in a task.|
+|receive time|For a record, receive time is when it is consumed from Kafka. Bireme record this time for the record which is the earliest received one in a task. We do so to monitor the longest time for a record from entering bireme to being successfully loaded.|
+|complete time|When the task is successfully loaded into target table.|
 
 **HTTP Server**
 
 Bireme starts a light HTTP server for acquiring current Load State.
 
-When the HTTP server is enabled the following endpoints are exposed: 
+When the HTTP server is started the following endpoints are exposed: 
 
 |Endpoint|Description|
 |:---:|:---:|
@@ -136,7 +137,7 @@ The result is organized in JSON format. Using parameter *pretty* will print the 
 
 **Example**
 
-The following is an example of LoadState:
+The following is an example of Load State:
 
 ```
 {
