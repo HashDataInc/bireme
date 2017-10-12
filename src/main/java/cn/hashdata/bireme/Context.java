@@ -184,8 +184,8 @@ public class Context {
     for (Entry<String, RowCache> entry : tableRowCache.entrySet()) {
       String fullTableName = entry.getKey();
       RowCache rowCache = entry.getValue();
-      metrics.register(MetricRegistry.name(RowCache.class, "for " + fullTableName),
-          new Gauge<Integer>() {
+      metrics.register(
+          MetricRegistry.name(RowCache.class, "for " + fullTableName), new Gauge<Integer>() {
             @Override
             public Integer getValue() {
               return rowCache.rows.size();

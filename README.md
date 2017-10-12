@@ -95,6 +95,7 @@ The configuration files consist of two parts:
 |merge.pool.size|Thread pool size for Merge|10|
 |merge.interval|Maxmium interval between Merge in milliseconds|10000|
 |merge.batch.size|Maxmium number of Row in one Merge|50000|
+|state.server.port|Port for state server|8080|
 
 ### 1.4.2 \<source_name\>.properties
 
@@ -106,7 +107,61 @@ In the configuration file for each data source, specify the table which the data
 ...
 ```
 
-## 1.5 Reference
+## 1.5 Monitoring
+
+**Load State**
+
+Bireme load a batch of change data at a time, which is called a Task. For each Task, bireme represents its state by Load State. The Load State of recently successfully loaded Task is used to describe the state of corresponding target table.
+
+Three kinds of time is used to describe a Load State.
+
+|Time|Description|
+|:---:|:---:|
+|produce time|For a record, produce time is when it entered the Kafka. Bireme record this time for the rocord which is the newest produced one in a Task.|
+|receive time|For a record, receive time is when it is received. Bireme record this time for the record which is the earliest received one in a Task.|
+|complete time|When the Task is successfully loaded into target table.|
+
+**HTTP Server**
+
+Bireme starts a light HTTP server for acquiring current Load State.
+
+When the HTTP server is enabled the following endpoints are exposed: 
+
+|Endpoint|Description|
+|:---:|:---:|
+|/|Get the Load State for all target table in the target database.|
+|/\<target table\>|Get the Load State for the given target table.|
+
+The result is organized in JSON format. Using parameter *pretty* will print the user-friendly result.
+
+**Example**
+
+The following is an example of LoadState:
+
+```
+{
+  "target_table": "public.chartarget",
+  "sources": [
+    {
+      "source": "debezium_CI",
+      "table_name": "public.charsource",
+      "produce_time": "2017-10-12T16:27:40.812Z",
+      "receive_time": "2017-10-12T16:30:10.160Z"
+    }
+  ],
+  "complete_time": "2017-10-12T16:30:20.009Z"
+}
+```
+
+* *target_table* is the target table name in the target database.
+* *sources* is an array, every element in which corresponds to a data souce. (Each target table may receive data from several data souces. Although in the example we have only one source.)
+ - *source* is the source name.
+ - *table_name* is the table name in source.
+ - *produce_time* see the definition above.
+ - *receive_time* see the definition above.
+* *complete_time* see the definition above.
+
+## 1.6 Reference
 
 [Maxwell Reference](http://maxwells-daemon.io/)  
 [Debezium Reference](http://debezium.io/)  

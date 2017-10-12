@@ -270,13 +270,14 @@ public class Config {
    * Print log about bireme configuration.
    */
   public void logConfig() {
-    String config = "Configures: " + "\n\tchangeSet queue size = " + changeset_queue_size
-        + "\n\ttransform thread pool size = " + transform_pool_size
-        + "\n\ttransform result queue size = " + trans_result_queue_size + "\n\trow cache size = "
-        + row_cache_size + "\n\tmerge thread pool size = " + merge_pool_size
-        + "\n\tmerge interval = " + merge_interval + "\n\tbatch size = " + batch_size
-        + "\n\tloader conn size = " + loader_conn_size + "\n\tloader task queue size = "
-        + loader_task_queue_size + "\n\treport interval = " + report_interval;
+    String config = "Configures: "
+        + "\n\tchangeSet queue size = " + changeset_queue_size + "\n\ttransform thread pool size = "
+        + transform_pool_size + "\n\ttransform result queue size = " + trans_result_queue_size
+        + "\n\trow cache size = " + row_cache_size + "\n\tmerge thread pool size = "
+        + merge_pool_size + "\n\tmerge interval = " + merge_interval
+        + "\n\tbatch size = " + batch_size + "\n\tloader conn size = " + loader_conn_size
+        + "\n\tloader task queue size = " + loader_task_queue_size
+        + "\n\treport interval = " + report_interval;
     logger.info(config);
 
     StringBuilder sb = new StringBuilder();
