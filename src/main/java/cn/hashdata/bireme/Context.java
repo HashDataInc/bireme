@@ -68,6 +68,8 @@ public class Context {
   public int exitLoaders;
   public WatchDog watchDog;
 
+  public StateServer server;
+
   static class WatchDog extends Thread {
     private DaemonController controller;
     private Context cxt;
@@ -119,6 +121,8 @@ public class Context {
     this.changeLoaders = new HashMap<String, ChangeLoader>();
     this.loaderConnections = new LinkedBlockingQueue<Connection>(conf.loader_conn_size);
     this.temporaryTables = new HashMap<Connection, HashSet<String>>();
+
+    this.server = new StateServer(this, conf.state_server_port);
 
     exitLoaders = 0;
 
@@ -180,8 +184,8 @@ public class Context {
     for (Entry<String, RowCache> entry : tableRowCache.entrySet()) {
       String fullTableName = entry.getKey();
       RowCache rowCache = entry.getValue();
-      metrics.register(
-          MetricRegistry.name(RowCache.class, "for " + fullTableName), new Gauge<Integer>() {
+      metrics.register(MetricRegistry.name(RowCache.class, "for " + fullTableName),
+          new Gauge<Integer>() {
             @Override
             public Integer getValue() {
               return rowCache.rows.size();

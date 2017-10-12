@@ -241,6 +241,7 @@ public class Bireme implements Daemon {
     createMaxwellChangeProvider();
     createDebeziumProvider();
     startReporter();
+    cxt.server.start();
 
     if (context != null) {
       cxt.startWatchDog(context.getController());
@@ -258,6 +259,7 @@ public class Bireme implements Daemon {
     cxt.stop = true;
     logger.info("set stop flag to true");
 
+    cxt.server.stop();
     cxt.threadPool.shutdownNow();
     cxt.loaderThreadPool.shutdownNow();
 

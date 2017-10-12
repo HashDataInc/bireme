@@ -171,8 +171,12 @@ public class RowCache {
       Thread.currentThread().setName("RowBatchMerger");
 
       LoadTask task = new LoadTask(mappedTableName);
+      LoadState state = task.loadState;
 
       for (Row row : rows) {
+        state.setProduceTime(row.originTable, row.produceTime);
+        state.setReceiveTime(row.originTable, row.receiveTime);
+
         switch (row.type) {
           case INSERT:
             task.insert.put(row.keys, row.tuple);
@@ -204,6 +208,7 @@ public class RowCache {
       cxt.idleRowArrays.returnObject(rows);
 
       task.callbacks = callbacks;
+
       return task;
     }
   }

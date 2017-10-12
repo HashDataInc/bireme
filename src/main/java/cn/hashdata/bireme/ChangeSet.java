@@ -41,7 +41,6 @@ public class ChangeSet {
     public void passivateObject(PooledObject<ChangeSet> pooledObject) {
       ChangeSet changeSet = pooledObject.getObject();
       changeSet.provider = null;
-      changeSet.createdAt = null;
       changeSet.changes = null;
       changeSet.callback = null;
     }

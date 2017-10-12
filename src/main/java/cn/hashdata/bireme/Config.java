@@ -44,6 +44,7 @@ public class Config {
   public int loader_conn_size;
   public int loader_task_queue_size;
   public int report_interval;
+  public int state_server_port;
 
   public ConnectionConfig target;
 
@@ -86,6 +87,7 @@ public class Config {
   protected void basicConfig() {
     reporter = config.getString("metrics.reporter", "console");
     report_interval = config.getInt("metrics.reporter.console.interval", 15);
+    state_server_port = config.getInt("state.server.port", 8080);
 
     transform_pool_size = config.getInt("transform.thread_pool.size", 10);
     changeset_queue_size = transform_pool_size * 2;
@@ -268,14 +270,13 @@ public class Config {
    * Print log about bireme configuration.
    */
   public void logConfig() {
-    String config = "Configures: "
-        + "\n\tchangeSet queue size = " + changeset_queue_size + "\n\ttransform thread pool size = "
-        + transform_pool_size + "\n\ttransform result queue size = " + trans_result_queue_size
-        + "\n\trow cache size = " + row_cache_size + "\n\tmerge thread pool size = "
-        + merge_pool_size + "\n\tmerge interval = " + merge_interval
-        + "\n\tbatch size = " + batch_size + "\n\tloader conn size = " + loader_conn_size
-        + "\n\tloader task queue size = " + loader_task_queue_size
-        + "\n\treport interval = " + report_interval;
+    String config = "Configures: " + "\n\tchangeSet queue size = " + changeset_queue_size
+        + "\n\ttransform thread pool size = " + transform_pool_size
+        + "\n\ttransform result queue size = " + trans_result_queue_size + "\n\trow cache size = "
+        + row_cache_size + "\n\tmerge thread pool size = " + merge_pool_size
+        + "\n\tmerge interval = " + merge_interval + "\n\tbatch size = " + batch_size
+        + "\n\tloader conn size = " + loader_conn_size + "\n\tloader task queue size = "
+        + loader_task_queue_size + "\n\treport interval = " + report_interval;
     logger.info(config);
 
     StringBuilder sb = new StringBuilder();

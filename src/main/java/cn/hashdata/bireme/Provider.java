@@ -137,7 +137,6 @@ public abstract class Provider implements Callable<Long> {
 
       try {
         rowSet = cxt.idleRowSets.borrowObject();
-        rowSet.createdAt = changeSet.createdAt;
       } catch (Exception e) {
         String message = "Can't not borrow RowSet from the Object Pool.";
         throw new BiremeException(message, e);

@@ -80,6 +80,7 @@ public class MaxwellProvider extends KafkaProvider {
       public String dataSource;
       public String database;
       public String table;
+      public Long produceTime;
       public RowType type;
       public JsonObject data;
       public JsonObject old;
@@ -91,6 +92,7 @@ public class MaxwellProvider extends KafkaProvider {
         this.dataSource = getProviderName();
         this.database = value.get("database").getAsString();
         this.table = value.get("table").getAsString();
+        this.produceTime = value.get("ts").getAsLong();
         this.data = value.get("data").getAsJsonObject();
 
         if (value.has("old") && !value.get("old").isJsonNull()) {
@@ -177,6 +179,7 @@ public class MaxwellProvider extends KafkaProvider {
       Table table = cxt.tablesInfo.get(getMappedTableName(record));
 
       row.type = record.type;
+      row.produceTime = record.produceTime;
       row.originTable = getOriginTableName(record);
       row.mappedTable = getMappedTableName(record);
       row.keys = formatColumns(record, table, table.keyIndexs, false);

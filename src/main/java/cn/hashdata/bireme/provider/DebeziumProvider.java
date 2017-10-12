@@ -79,12 +79,14 @@ public class DebeziumProvider extends KafkaProvider {
   public class DebeziumTransformer extends KafkaTransformer {
     public class DebeziumRecord implements Record {
       public String topic;
+      public Long produceTime;
       public RowType type;
       public JsonObject data;
 
       public DebeziumRecord(String topic, JsonObject payLoad) {
         this.topic = topic;
         char op = payLoad.get("op").getAsCharacter();
+        this.produceTime = payLoad.get("ts_ms").getAsLong();
 
         JsonElement element = null;
         switch (op) {
@@ -142,6 +144,7 @@ public class DebeziumProvider extends KafkaProvider {
       Table table = cxt.tablesInfo.get(getMappedTableName(record));
 
       row.type = record.type;
+      row.produceTime = record.produceTime;
       row.originTable = getOriginTableName(record);
       row.mappedTable = getMappedTableName(record);
       row.keys = formatColumns(record, table, table.keyIndexs, false);

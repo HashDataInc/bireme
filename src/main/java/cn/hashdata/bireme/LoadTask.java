@@ -18,6 +18,7 @@ import java.util.HashSet;
 public class LoadTask {
   public String tableName;
   public ArrayList<CommitCallback> callbacks;
+  public LoadState loadState;
   public HashSet<String> delete;
   public HashMap<String, String> insert;
 
@@ -29,6 +30,7 @@ public class LoadTask {
   public LoadTask(String tableName) {
     this.tableName = tableName;
     this.callbacks = new ArrayList<CommitCallback>();
+    this.loadState = new LoadState();
     this.delete = new HashSet<String>();
     this.insert = new HashMap<String, String>();
   }
