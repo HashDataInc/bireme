@@ -36,7 +36,9 @@ public class LoadState {
    * @param time Unix time
    */
   public void setReceiveTime(String table, Long time) {
-    receiveTime.put(table, time);
+    if (!receiveTime.containsKey(table)) {
+      receiveTime.put(table, time);
+    }
   }
 
   /**
