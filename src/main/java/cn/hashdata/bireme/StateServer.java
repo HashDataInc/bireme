@@ -37,6 +37,7 @@ public class StateServer {
    *
    * @param cxt the Bireme Context
    * @param port the binded port of the server
+   * @param addr the binded IP address for the server
    * @throws BiremeException Unknown Host
    */
   public StateServer(Context cxt, String addr, int port) throws BiremeException {
