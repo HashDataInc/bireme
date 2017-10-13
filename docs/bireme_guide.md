@@ -1,6 +1,8 @@
 # Getting Started Guide
 
-In this section, we will demonstrate how to use bireme to synchronize a table named *demo.test* in MySQL to another table named *public.test* in GreenPlum database. Before we start, users need to deploy MySQL, Kafka and GreenPlum.
+# Part 1 Maxwell Data Source
+
+In this part, we will demonstrate how to use bireme cooperated with maxwell to synchronize a table named *demo.test* in MySQL to another table named *public.test* in GreenPlum database. Before we start, users need to deploy MySQL, Kafka and GreenPlum.
 
 **Note:** All tables must contain primary key.
 
@@ -101,4 +103,112 @@ bin/bireme stop
 
 Log files are located in *logs* directory.
 
+# Part 2 Debezium Data Source
+
+In this part, we will demonstrate how to use bireme cooperated with debezium to synchronize a table named *public.source* in Postgres to another table named *public.target* in GreenPlum database. For convenience, we will use docker to set up Postgres, Kafka and Kafka Connect.
+
+**Note:** All tables must contain primary key.
+
+## 1. Preparation
+
+### 1.1 Set up in docker
+
+**Start Postgres**
+
+```
+$ docker run -it --name Postgres -p 5432:5432 -d debezium/postgres:latest
+```
+
+**Start Zookeeper**
+
+```
+$ docker run -it --name Zookeeper -p 2181:2181 -p 2888:2888 -p 3888:3888 -d debezium/zookeeper:0.5
+```
+
+**Start Kafka**
+
+```
+$ docker run -it --name Kafka -p 9092:9092 \
+				-e ZOOKEEPER_CONNECT=Zookeeper:2181 \
+				--link Zookeeper:Zookeeper -d debezium/kafka:0.5
+```
+
+**Start Kafka Connect**
+
+```
+$ docker run -it --name Connect -p 8083:8083 \
+				-e BOOTSTRAP_SERVERS=Kafka:9092 \
+				-e CONFIG_STORAGE_TOPIC=my_connect_configs \
+				-e OFFSET_STORAGE_TOPIC=my_connect_offsets \
+				--link Zookeeper:Zookeeper --link Kafka:Kafka --link Postgres:Postgres \
+				-d debezium/connect:0.5
+```
+
+### 1.2 Monitor the Postgres database
+
+We will use `curl` to submit to Kafka Connect service a JSON request message with information about the connector we want to start.
+
+```
+$ CONNECTOR_CONFIG='
+{
+    "name": "inventory-connector",
+    "config": {
+        "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+        "database.hostname": "postgres",
+        "database.port": "5432",
+        "database.user": "postgres",
+        "database.password": "postgres",
+        "database.dbname": "postgres",
+        "database.server.name": "debezium"
+    }
+}'
+
+$ curl -i -X POST -H "Accept:application/json" \
+                -H "Content-Type:application/json" localhost:8083/connectors/ \
+                -d "${CONNECTOR_CONFIG}"
+```
+
+### 1.3 Create table in Postgres and Greenplum separately
+
+In Postgres
+
+```
+create table target (id int primary key, name varchar(10));
+```
+
+In Greenplum
+
+```
+create table source (id int primary key, name varchar(10));
+```
+
+## 2 Config bireme and start
+
+### 2.1 Edit etc/config.properties
+
+Specify connection infomation to the target database, as well as data source information.
+
+```
+target.url = jdbc:postgresql://gpdbhost:5432/XXXXXX
+target.user = XXXXXX
+target.passwd = XXXXXX
+
+data_source = debezium
+
+debezium.type = maxwell
+debezium.kafka.server = kafkahost:9092
+```
+**Note:** The value of data_source must be identical to the `database.server.name` configuration in Section 1.2 and we don't need to designate a topic.
+
+### 2.2 Edit table mapping file
+
+As we appoint *debezium* as data source name, we need to create a file *debezium.properties* in *etc* directory and insert the following.
+
+```
+public.source = public.target
+```
+
+### 2.3 Start bireme
+
+Reference the same step in Part 1.
 
