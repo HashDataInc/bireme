@@ -1,6 +1,8 @@
 # 快速开始
 
-在这一部分，将演示如何用 bireme 同步 MySQL 的一张表 demo.test 到 GreenPlum 数据库 public.test。在开始之前，用户需要部署好 MySQL，Kafka 以及 GreenPlum。  
+# Part 1： Maxwell 数据源
+
+在这一部分，将演示如何用 bireme 和 maxwell 同步 MySQL 的一张表 demo.test 到 GreenPlum 数据库 public.test。在开始之前，用户需要部署好 MySQL，Kafka 以及 GreenPlum。  
 **注:** 必须保证所有表都包含主键。
 
 ## 1. 准备工作
@@ -97,3 +99,111 @@ bin/bireme stop
 ```
 
 bireme 的输出及日志位于 logs 文件夹下。
+
+# Part 2: Debezium 数据源
+
+在这一部分，将演示如何用 bireme 和 debezium 同步 Postgres 的一张表 public.source 到 GreenPlum 数据库 public.target。为了方便，我们使用 docker 部署 Postgres，Kafka 以及 Kafka Connect。
+
+## 1. 准备工作
+
+### 1.1 启动 docker 容器
+
+**启动 Postgres**
+
+```
+$ docker run -it --name Postgres -p 5432:5432 -d debezium/postgres:latest
+```
+
+**启动 Zookeeper**
+
+```
+$ docker run -it --name Zookeeper -p 2181:2181 -p 2888:2888 -p 3888:3888 -d debezium/zookeeper:0.5
+```
+
+**启动 Kafka**
+
+```
+$ docker run -it --name Kafka -p 9092:9092 \
+				-e ZOOKEEPER_CONNECT=Zookeeper:2181 \
+				--link Zookeeper:Zookeeper -d debezium/kafka:0.5
+```
+
+**启动 Kafka Connect**
+
+```
+$ docker run -it --name Connect -p 8083:8083 \
+				-e BOOTSTRAP_SERVERS=Kafka:9092 \
+				-e CONFIG_STORAGE_TOPIC=my_connect_configs \
+				-e OFFSET_STORAGE_TOPIC=my_connect_offsets \
+				--link Zookeeper:Zookeeper --link Kafka:Kafka --link Postgres:Postgres \
+				-d debezium/connect:0.5
+```
+
+### 1.2 监听 Postgres 数据库
+
+使用 `curl` 发送请求给 Kafka Connect，请求的格式为 JSON 包含了 connector 的配置信息。
+
+```
+$ CONNECTOR_CONFIG='
+{
+    "name": "inventory-connector",
+    "config": {
+        "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+        "database.hostname": "postgres",
+        "database.port": "5432",
+        "database.user": "postgres",
+        "database.password": "postgres",
+        "database.dbname": "postgres",
+        "database.server.name": "debezium"
+    }
+}'
+
+$ curl -i -X POST -H "Accept:application/json" \
+                -H "Content-Type:application/json" localhost:8083/connectors/ \
+                -d "${CONNECTOR_CONFIG}"
+```
+
+### 1.3 分别在 Postgres 和 Greenplum 中创建表
+
+Postgres 中创建 source 表
+
+```
+create table source (id int primary key, name varchar(10));
+```
+
+Greenplum 中创建 target 表
+
+```
+create table 表 (id int primary key, name varchar(10));
+```
+
+## 2 bireme 配置及启动
+
+### 2.1 修改 etc/config.properties
+
+在 config.properties 文件中指定目标数据库的连接信息，数据源信息
+
+```
+target.url = jdbc:postgresql://gpdbhost:5432/XXXXXX
+target.user = XXXXXX
+target.passwd = XXXXXX
+
+data_source = debezium
+
+debezium.type = maxwell
+debezium.kafka.server = kafkahost:9092
+```
+**Note:** data_source 的值必须与 1.2 部分中 `database.server.name` 配置项一致，这里不需要指定 Kafka topic。
+
+### 2.2 修改表映射文件
+
+在 config.properties 文件中指定数据源为 debezium，因此需要新建文件 etc/debezium.properties，加入修改
+
+
+```
+public.source = public.target
+```
+
+### 2.3 Start bireme
+
+参照 Part 1 中相同步骤。
