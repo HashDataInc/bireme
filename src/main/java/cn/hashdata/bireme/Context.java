@@ -97,8 +97,9 @@ public class Context {
    * Create a new bireme context.
    *
    * @param conf bireme configuration
+   * @throws BiremeException Unknown Host
    */
-  public Context(Config conf) {
+  public Context(Config conf) throws BiremeException {
     this(conf, false);
   }
 
@@ -107,8 +108,9 @@ public class Context {
    *
    * @param conf bireme configuration
    * @param test unitest or not
+   * @throws BiremeException Unknown Host
    */
-  public Context(Config conf, Boolean test) {
+  public Context(Config conf, Boolean test) throws BiremeException {
     this.conf = conf;
 
     this.tableMap = conf.tableMap;
@@ -122,7 +124,7 @@ public class Context {
     this.loaderConnections = new LinkedBlockingQueue<Connection>(conf.loader_conn_size);
     this.temporaryTables = new HashMap<Connection, HashSet<String>>();
 
-    this.server = new StateServer(this, conf.state_server_port);
+    this.server = new StateServer(this, conf.state_server_addr, conf.state_server_port);
 
     exitLoaders = 0;
 
@@ -184,8 +186,8 @@ public class Context {
     for (Entry<String, RowCache> entry : tableRowCache.entrySet()) {
       String fullTableName = entry.getKey();
       RowCache rowCache = entry.getValue();
-      metrics.register(MetricRegistry.name(RowCache.class, "for " + fullTableName),
-          new Gauge<Integer>() {
+      metrics.register(
+          MetricRegistry.name(RowCache.class, "for " + fullTableName), new Gauge<Integer>() {
             @Override
             public Integer getValue() {
               return rowCache.rows.size();

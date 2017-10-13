@@ -36,7 +36,9 @@ public class LoadState {
    * @param time Unix time
    */
   public void setReceiveTime(String table, Long time) {
-    receiveTime.put(table, time);
+    if (!receiveTime.containsKey(table)) {
+      receiveTime.put(table, time);
+    }
   }
 
   /**
@@ -89,7 +91,7 @@ public class LoadState {
 
   /**
    * Reorganized the State into an object that is convenient to form a Json String.
-   * 
+   *
    * @param targetTable the target Table
    * @return A State object
    */
@@ -117,7 +119,7 @@ public class LoadState {
 
   /**
    * PlainState is a class which is convenient to form a Json String.
-   * 
+   *
    * @author yuze
    *
    */
