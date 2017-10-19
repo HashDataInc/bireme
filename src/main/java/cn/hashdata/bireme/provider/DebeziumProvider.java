@@ -1,7 +1,3 @@
-/**
- * Copyright HashData. All Rights Reserved.
- */
-
 package cn.hashdata.bireme.provider;
 
 import java.math.BigDecimal;
@@ -12,13 +8,13 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.Iterator;
+import java.util.List;
 import java.util.TimeZone;
+import java.util.stream.Collectors;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 
 import com.google.gson.JsonElement;
@@ -33,42 +29,15 @@ import cn.hashdata.bireme.Row;
 import cn.hashdata.bireme.Table;
 import cn.hashdata.bireme.Row.RowType;
 
-/**
- * {@code DebeziumProvider} is a type of {@code Provider} to process data from <B>Debezium +
- * Kafka</B> data source.
- *
- * @author yuze
- *
- */
 public class DebeziumProvider extends KafkaProvider {
-  final public static String PROVIDER_TYPE = "Debezium";
-
-  public DebeziumProvider(Context cxt, KafkaProviderConfig config) {
-    this(cxt, config, false);
-  }
-
-  public DebeziumProvider(Context cxt, KafkaProviderConfig config, boolean test) {
-    super(cxt, config, test);
-  }
-
-  @Override
-  protected ArrayList<TopicPartition> createTopicPartitions() {
-    Iterator<PartitionInfo> iterator;
-    ArrayList<TopicPartition> tpArray = new ArrayList<TopicPartition>();
-    PartitionInfo partitionInfo;
-    TopicPartition tp;
-
-    for (String topic : providerConfig.tableMap.keySet()) {
-      iterator = consumer.partitionsFor(topic).iterator();
-
-      while (iterator.hasNext()) {
-        partitionInfo = iterator.next();
-        tp = new TopicPartition(topic, partitionInfo.partition());
-        tpArray.add(tp);
-      }
-    }
-
-    return tpArray;
+  public DebeziumProvider(Context cxt, ProviderConfig conf, String topic) {
+    super(cxt, conf);
+    List<TopicPartition> topicPartition =
+        consumer.partitionsFor(topic)
+            .stream()
+            .map(p -> new TopicPartition(p.topic(), p.partition()))
+            .collect(Collectors.toList());
+    consumer.assign(topicPartition);
   }
 
   @Override
@@ -121,7 +90,7 @@ public class DebeziumProvider extends KafkaProvider {
     }
 
     private String getMappedTableName(DebeziumRecord record) {
-      return tableMap.get(record.topic);
+      return cxt.tableMap.get(record.topic);
     }
 
     private String getOriginTableName(DebeziumRecord record) {
@@ -231,7 +200,9 @@ public class DebeziumProvider extends KafkaProvider {
           try {
             c.setTime(sdf.parse("1970-01-01"));
           } catch (ParseException e) {
+            /* TODO
             logger.error("Can not decode Data/Time {}, message{}.", data, e.getMessage());
+            */
             return "";
           }
 

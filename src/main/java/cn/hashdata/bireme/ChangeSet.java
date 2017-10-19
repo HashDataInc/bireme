@@ -17,7 +17,6 @@ import org.apache.commons.pool2.impl.DefaultPooledObject;
  *
  */
 public class ChangeSet {
-  public Provider provider;
   public Date createdAt;
   public Object changes;
   public CommitCallback callback;
@@ -40,7 +39,6 @@ public class ChangeSet {
     @Override
     public void passivateObject(PooledObject<ChangeSet> pooledObject) {
       ChangeSet changeSet = pooledObject.getObject();
-      changeSet.provider = null;
       changeSet.changes = null;
       changeSet.callback = null;
     }

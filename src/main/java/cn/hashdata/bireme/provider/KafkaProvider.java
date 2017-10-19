@@ -1,15 +1,9 @@
-/**
- * Copyright HashData. All Rights Reserved.
- */
-
 package cn.hashdata.bireme.provider;
 
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Properties;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -18,53 +12,43 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 
 import cn.hashdata.bireme.AbstractCommitCallback;
+import cn.hashdata.bireme.BiremeException;
 import cn.hashdata.bireme.ChangeSet;
 import cn.hashdata.bireme.CommitCallback;
 import cn.hashdata.bireme.Context;
-import cn.hashdata.bireme.BiremeException;
-import cn.hashdata.bireme.Provider;
 import cn.hashdata.bireme.Row;
 import cn.hashdata.bireme.RowSet;
 
-/**
- * {@code KafkaProvider} is able to poll change data from Kafka.
- *
- * @author yuze
- *
- */
 public abstract class KafkaProvider extends Provider {
-  protected static final Long TIMEOUT_MS = 1000L;
-  public static final String ABSTRACT_PROVIDER_TYPE = "Kafka";
-
-  public static class KafkaProviderConfig extends ProviderConfig {
-    public String topic;
-    public String server;
-    public String groupID;
-  }
-
-  public KafkaProviderConfig providerConfig;
   protected KafkaConsumer<String, String> consumer;
-  private LinkedBlockingQueue<KafkaCommitCallback> commitCallbacks;
+  protected LinkedBlockingQueue<KafkaCommitCallback> commitCallbacks;
 
-  /**
-   * Create a new {@code kafkaProvider}.
-   *
-   * @param cxt the {@code Context}
-   * @param providerConfig configuration for the {@code KafkaProvider}
-   * @param test unitest or not
-   */
-  public KafkaProvider(Context cxt, KafkaProviderConfig providerConfig, boolean test) {
-    super(cxt, providerConfig);
-    this.providerConfig = providerConfig;
-    this.commitCallbacks = new LinkedBlockingQueue<KafkaCommitCallback>();
-
-    if (!test) {
-      consumer = new KafkaConsumer<String, String>(kafkaProps());
-      consumer.assign(createTopicPartitions());
-    }
+  public KafkaProvider(Context cxt, ProviderConfig conf) {
+    super(cxt, conf);
+    consumer = KafkaProvider.createConsumer(conf.server, conf.groupID);
+    commitCallbacks = new LinkedBlockingQueue<KafkaCommitCallback>();
   }
 
-  private void checkAndCommit() {
+  @Override
+  public ChangeSet pollChangeSet() throws BiremeException {
+    ConsumerRecords<String, String> records = consumer.poll(1000L);
+
+    if (cxt.stop || records.isEmpty()) {
+      return null;
+    }
+
+    KafkaCommitCallback callback = new KafkaCommitCallback();
+
+    if (!commitCallbacks.offer(callback)) {
+      String Message = "Can't add CommitCallback to queue.";
+      throw new BiremeException(Message);
+    }
+
+    return packRecords(records, callback);
+  }
+
+  @Override
+  public void checkAndCommit() {
     CommitCallback callback = null;
 
     while (!commitCallbacks.isEmpty()) {
@@ -80,25 +64,12 @@ public abstract class KafkaProvider extends Provider {
     }
   }
 
-  private Properties kafkaProps() {
-    Properties props = new Properties();
-    props.put("bootstrap.servers", providerConfig.server);
-    props.put("group.id", providerConfig.groupID);
-    props.put("enable.auto.commit", false);
-    props.put("session.timeout.ms", 30000);
-    props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-    props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-    props.put("auto.offset.reset", "earliest");
-    return props;
-  }
-
   private ChangeSet packRecords(ConsumerRecords<String, String> records,
       KafkaCommitCallback callback) throws BiremeException {
     ChangeSet changeSet;
 
     try {
       changeSet = cxt.idleChangeSets.borrowObject();
-      changeSet.provider = this;
       changeSet.createdAt = new Date();
       changeSet.changes = records;
       changeSet.callback = callback;
@@ -108,73 +79,6 @@ public abstract class KafkaProvider extends Provider {
     }
 
     return changeSet;
-  }
-
-  /**
-   * Create a list of {@code TopicPartition} to subscribe according configuration.
-   *
-   * @return an ArrayList of {@code TopicPartition}
-   */
-  protected abstract ArrayList<TopicPartition> createTopicPartitions();
-
-  /**
-   * Start the {@code KafkaProvider}. It constantly poll data from the designated
-   * {@code TopicPartition} and pack the change data into {@code ChangeSet}, transfer it to the
-   * Change Set Queue in Context.
-   *
-   * @throws BiremeException can not borrow changeset from object pool
-   * @throws InterruptedException if interrupted while waiting
-   */
-  @Override
-  public Long call() throws BiremeException, InterruptedException {
-    Thread.currentThread().setName("Provider " + getProviderName());
-
-    logger.info("Provider {} Start.", getProviderName());
-
-    ConsumerRecords<String, String> records = null;
-    ChangeSet changeSet = null;
-    boolean success = false;
-
-    try {
-      while (!cxt.stop) {
-        do {
-          records = consumer.poll(TIMEOUT_MS);
-          checkAndCommit();
-        } while (records.isEmpty() && !cxt.stop);
-
-        if (cxt.stop) {
-          break;
-        }
-
-        KafkaCommitCallback callback = new KafkaCommitCallback();
-
-        if (!commitCallbacks.offer(callback)) {
-          String Message = "Can't add CommitCallback to queue.";
-          throw new BiremeException(Message);
-        }
-
-        changeSet = packRecords(records, callback);
-
-        recordMeter.mark(records.count());
-
-        do {
-          success = changeSetOut.offer(changeSet, TIMEOUT_MS, TimeUnit.MILLISECONDS);
-          checkAndCommit();
-        } while (!success && !cxt.stop);
-      }
-    } catch (BiremeException e) {
-      logger.fatal("Provider {} exit on error. Message ", getProviderName(), e.getMessage());
-      logger.fatal("Stack Trace: ", e);
-      throw e;
-    } finally {
-      try {
-        consumer.close();
-      } catch (Exception ignore) {
-      }
-    }
-
-    logger.info("Provider {} exit.", getProviderName());
-    return 0L;
   }
 
   /**
@@ -258,5 +162,17 @@ public abstract class KafkaProvider extends Provider {
       committed.set(true);
       partitionOffset.clear();
     }
+  }
+
+  public static KafkaConsumer<String, String> createConsumer(String server, String groupID) {
+    Properties props = new Properties();
+    props.put("bootstrap.servers", server);
+    props.put("group.id", "bireme1");
+    props.put("enable.auto.commit", false);
+    props.put("session.timeout.ms", 30000);
+    props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+    props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+    props.put("auto.offset.reset", "earliest");
+    return new KafkaConsumer<String, String>(props);
   }
 }

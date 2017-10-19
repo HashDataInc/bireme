@@ -1,61 +1,115 @@
-/**
- * Copyright HashData. All Rights Reserved.
- */
-
-package cn.hashdata.bireme;
+package cn.hashdata.bireme.provider;
 
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import cn.hashdata.bireme.BiremeException;
+import cn.hashdata.bireme.ChangeSet;
+import cn.hashdata.bireme.Context;
+import cn.hashdata.bireme.Dispatcher;
+import cn.hashdata.bireme.Record;
+import cn.hashdata.bireme.Row;
+import cn.hashdata.bireme.RowCache;
+import cn.hashdata.bireme.RowSet;
+import cn.hashdata.bireme.Table;
 
-import com.codahale.metrics.Meter;
-import com.codahale.metrics.MetricRegistry;
+public abstract class Provider {
+  public Context cxt;
+  public ProviderConfig conf;
 
-import cn.hashdata.bireme.provider.ProviderConfig;
+  public LinkedBlockingQueue<Future<RowSet>> transResult;
+  private LinkedList<Transformer> localTransformer;
 
-/**
- * {@code Provider} is responsible for polling data from data source and provide to
- * {@code Dispatcher}. Each {@code Provider} must its own {@code Transformer}, which could transform
- * the polled data to bireme inner format.
- *
- * @author yuze
- *
- */
-public abstract class Provider implements Callable<Long> {
-  protected static final Long TIMEOUT_MS = 1000L;
+  private Dispatcher dispatcher;
+  private Future<Long> dispatchReturn;
 
-  protected Logger logger;
-  protected Meter recordMeter;
-
-  protected Context cxt;
-  protected ProviderConfig conf;
-  protected HashMap<String, String> tableMap;
-  protected LinkedBlockingQueue<ChangeSet> changeSetOut;
-  protected LinkedBlockingQueue<Transformer> idleTransformer;
+  public ConcurrentHashMap<String, RowCache> cache; // TODO key target table
 
   public Provider(Context cxt, ProviderConfig conf) {
     this.cxt = cxt;
     this.conf = conf;
-    this.tableMap = cxt.tableMap;
-    this.changeSetOut = cxt.changeSetQueue;
-    this.idleTransformer = new LinkedBlockingQueue<Transformer>();
 
-    this.logger = LogManager.getLogger("Bireme." + Provider.class + " " + getProviderName());
-    this.recordMeter = cxt.metrics.meter(MetricRegistry.name(Provider.class, getProviderName()));
+    int queueSize = 10; // set in configuration
+
+    transResult = new LinkedBlockingQueue<Future<RowSet>>(queueSize);
+    localTransformer = new LinkedList<Transformer>();
+
+    cache = new ConcurrentHashMap<String, RowCache>();
+
+    dispatchReturn = null;
+    dispatcher = new Dispatcher(cxt, this);
+
+    for (int i = 0; i < queueSize; i++) {
+      localTransformer.add(createTransformer());
+    }
   }
 
-  /**
-   * Get the type of the provider.
-   *
-   * @return the type of the provider
-   */
-  public String getProviderType() {
-    return conf.type.toString();
+  public void execute() throws BiremeException, InterruptedException {
+    // Poll data and start transformer
+    while (transResult.remainingCapacity() != 0) {
+      ChangeSet changeSet = pollChangeSet();
+
+      if (changeSet == null) {
+        break;
+      }
+
+      Transformer trans = localTransformer.remove();
+      trans.setChangeSet(changeSet);
+      startTransform(trans);
+      localTransformer.add(trans);
+    }
+
+    // Start dispatcher, only one dispatcher for each pipeline
+    if (!transResult.isEmpty()) {
+      if (dispatchReturn == null) {
+        startDispatch();
+
+      } else if (dispatchReturn.isDone()) {
+        try {
+          dispatchReturn.get();
+        } catch (ExecutionException e) {
+          throw new BiremeException("Dispatch failed.\n", e.getCause());
+        }
+
+        startDispatch();
+      }
+    }
+
+    // Start merger
+    for (RowCache rowCache : cache.values()) {
+      if (rowCache.shouldMerge()) {
+        rowCache.startMerge();
+      }
+    }
+
+    // Commit result
+    checkAndCommit();
+    return;
+  }
+
+  public abstract ChangeSet pollChangeSet() throws BiremeException;
+
+  public abstract void checkAndCommit();
+
+  public abstract Transformer createTransformer();
+
+  private void startTransform(Transformer trans) {
+    ExecutorService transformerPool = cxt.transformerPool;
+    Future<RowSet> result = transformerPool.submit(trans);
+    transResult.add(result);
+  }
+
+  private void startDispatch() {
+    ExecutorService dispatcherPool = cxt.dispatcherPool;
+    dispatchReturn = dispatcherPool.submit(dispatcher);
   }
 
   /**
@@ -63,45 +117,8 @@ public abstract class Provider implements Callable<Long> {
    *
    * @return the name for the provider
    */
-  public String getProviderName() {
+  public String getPipeLineName() {
     return conf.name;
-  }
-
-  /**
-   * Create a new transformer corresponding to the provider.
-   *
-   * @return the new created transformer
-   */
-  abstract public Transformer createTransformer();
-
-  /**
-   * Borrow a {@code Transformer} from the {@code Provider} and set the {@code ChangeSet} to be
-   * transformer. This method should be non-blocking. If no {@code Transformer} is available
-   * currently, create a new {@code Transformer}.
-   *
-   * @param changeSet The {@code ChangeSet} that need to be transformed.
-   * @return The borrowed {@code Transformer}.
-   */
-  public Transformer borrowTransformer(ChangeSet changeSet) {
-    Transformer transformer = idleTransformer.poll();
-
-    if (transformer == null) {
-      transformer = createTransformer();
-    }
-
-    transformer.setChangeSet(changeSet);
-
-    return transformer;
-  };
-
-  /**
-   * Return the borrowed {@code Transformer} to the pool.
-   *
-   * @param trans The {@code Transformer} should be returned.
-   */
-  public void returnTransformer(Transformer trans) {
-    trans.setChangeSet(null);
-    idleTransformer.offer(trans);
   }
 
   /**
@@ -145,6 +162,7 @@ public abstract class Provider implements Callable<Long> {
       fillRowSet(rowSet);
 
       cxt.idleChangeSets.returnObject(changeSet);
+      changeSet = null;
 
       return rowSet;
     }
@@ -295,7 +313,7 @@ public abstract class Provider implements Callable<Long> {
 
         switch (c) {
           case 0x00:
-            logger.warn("illegal character 0x00, deleted.");
+            // TODO logger.warn("illegal character 0x00, deleted.");
             continue;
           case QUOTE:
           case ESCAPE:
@@ -361,9 +379,9 @@ public abstract class Provider implements Callable<Long> {
      *
      * @return the outer {@code Provider}
      */
-    public Provider getProvider() {
-      return Provider.this;
-    }
+    /*
+     * TODO public Provider getProvider() { return Provider.this; }
+     */
 
     /**
      * After convert a single change data to a {@code Row}, insert into the {@code RowSet}.

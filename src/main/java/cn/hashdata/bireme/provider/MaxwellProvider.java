@@ -1,15 +1,11 @@
-/**
- * Copyright HashData. All Rights Reserved.
- */
-
 package cn.hashdata.bireme.provider;
 
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.Arrays;
+import java.util.HashMap;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 
 import com.google.gson.JsonObject;
@@ -23,49 +19,15 @@ import cn.hashdata.bireme.Row;
 import cn.hashdata.bireme.Table;
 import cn.hashdata.bireme.Row.RowType;
 
-/**
- * {@code MaxwellChangeProvider} is a type of {@code Provider} to process data from <B>Maxwell +
- * Kafka</B> data source.
- *
- * @author yuze
- *
- */
 public class MaxwellProvider extends KafkaProvider {
-  final public static String PROVIDER_TYPE = "Maxwell";
-
-  public MaxwellProvider(Context cxt, KafkaProviderConfig config) {
-    this(cxt, config, false);
-  }
-
-  /**
-   * Create a new {@code MaxwellChangeProvider}.
-   *
-   * @param cxt bireme context
-   * @param config {@code MaxwellConfig}.
-   * @param test for unitest
-   */
-  public MaxwellProvider(Context cxt, KafkaProviderConfig config, boolean test) {
-    super(cxt, config, test);
-  }
-
-  @Override
-  protected ArrayList<TopicPartition> createTopicPartitions() {
-    Iterator<PartitionInfo> iterator = consumer.partitionsFor(providerConfig.topic).iterator();
-    ArrayList<TopicPartition> tpArray = new ArrayList<TopicPartition>();
-    PartitionInfo partitionInfo;
-    TopicPartition tp;
-
-    while (iterator.hasNext()) {
-      partitionInfo = iterator.next();
-      tp = new TopicPartition(providerConfig.topic, partitionInfo.partition());
-      tpArray.add(tp);
-    }
-    return tpArray;
+  public MaxwellProvider(Context cxt, ProviderConfig conf, int partitionID) {
+    super(cxt, conf);
+    consumer.assign(Arrays.asList(new TopicPartition(conf.topic, partitionID)));
   }
 
   @Override
   public Transformer createTransformer() {
-    return new MaxwellChangeTransformer();
+    return new MaxwellTransformer();
   }
 
   /**
@@ -75,67 +37,16 @@ public class MaxwellProvider extends KafkaProvider {
    * @author yuze
    *
    */
-  public class MaxwellChangeTransformer extends KafkaTransformer {
-    public class MaxwellRecord implements Record {
-      public String dataSource;
-      public String database;
-      public String table;
-      public Long produceTime;
-      public RowType type;
-      public JsonObject data;
-      public JsonObject old;
+  public class MaxwellTransformer extends KafkaTransformer {
+    HashMap<String, String> tableMap;
 
-      public MaxwellRecord(String changeValue) {
-        JsonParser jsonParser = new JsonParser();
-        JsonObject value = (JsonObject) jsonParser.parse(changeValue);
-
-        this.dataSource = getProviderName();
-        this.database = value.get("database").getAsString();
-        this.table = value.get("table").getAsString();
-        this.produceTime = value.get("ts").getAsLong();
-        this.data = value.get("data").getAsJsonObject();
-
-        if (value.has("old") && !value.get("old").isJsonNull()) {
-          this.old = value.get("old").getAsJsonObject();
-        }
-
-        switch (value.get("type").getAsString()) {
-          case "insert":
-            type = RowType.INSERT;
-            break;
-
-          case "update":
-            type = RowType.UPDATE;
-            break;
-
-          case "delete":
-            type = RowType.DELETE;
-            break;
-        }
-      }
-
-      @Override
-      public String getField(String fieldName, boolean oldValue) throws BiremeException {
-        String field = null;
-
-        if (oldValue) {
-          try {
-            field = BiremeUtility.jsonGetIgnoreCase(old, fieldName);
-            return field;
-          } catch (BiremeException ignore) {
-          }
-        }
-
-        return BiremeUtility.jsonGetIgnoreCase(data, fieldName);
-      }
-    }
-
-    public MaxwellChangeTransformer() {
+    public MaxwellTransformer() {
       super();
+      tableMap = conf.tableMap;
     }
 
     private String getMappedTableName(MaxwellRecord record) {
-      return tableMap.get(record.dataSource + "." + record.database + "." + record.table);
+      return cxt.tableMap.get(record.dataSource + "." + record.database + "." + record.table);
     }
 
     private String getOriginTableName(MaxwellRecord record) {
@@ -145,9 +56,7 @@ public class MaxwellProvider extends KafkaProvider {
     private boolean filter(MaxwellRecord record) {
       String fullTableName = record.dataSource + "." + record.database + "." + record.table;
 
-      MaxwellProvider p = (MaxwellProvider) changeSet.provider;
-      if (!p.providerConfig.tableMap.containsKey(fullTableName)) {
-        // Do not sync this table
+      if (!tableMap.containsKey(fullTableName)) {
         return true;
       }
 
@@ -203,6 +112,60 @@ public class MaxwellProvider extends KafkaProvider {
       }
 
       return true;
+    }
+
+    public class MaxwellRecord implements Record {
+      public String dataSource;
+      public String database;
+      public String table;
+      public Long produceTime;
+      public RowType type;
+      public JsonObject data;
+      public JsonObject old;
+
+      public MaxwellRecord(String changeValue) {
+        JsonParser jsonParser = new JsonParser();
+        JsonObject value = (JsonObject) jsonParser.parse(changeValue);
+
+        this.dataSource = getPipeLineName();
+        this.database = value.get("database").getAsString();
+        this.table = value.get("table").getAsString();
+        this.produceTime = value.get("ts").getAsLong();
+        this.data = value.get("data").getAsJsonObject();
+
+        if (value.has("old") && !value.get("old").isJsonNull()) {
+          this.old = value.get("old").getAsJsonObject();
+        }
+
+        switch (value.get("type").getAsString()) {
+          case "insert":
+            type = RowType.INSERT;
+            break;
+
+          case "update":
+            type = RowType.UPDATE;
+            break;
+
+          case "delete":
+            type = RowType.DELETE;
+            break;
+        }
+      }
+
+      @Override
+      public String getField(String fieldName, boolean oldValue) throws BiremeException {
+        String field = null;
+
+        if (oldValue) {
+          try {
+            field = BiremeUtility.jsonGetIgnoreCase(old, fieldName);
+            return field;
+          } catch (BiremeException ignore) {
+          }
+        }
+
+        return BiremeUtility.jsonGetIgnoreCase(data, fieldName);
+      }
     }
   }
 }

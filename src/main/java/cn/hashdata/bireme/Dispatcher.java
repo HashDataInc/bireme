@@ -1,144 +1,95 @@
-/**
- * Copyright HashData. All Rights Reserved.
- */
-
 package cn.hashdata.bireme;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletionService;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorCompletionService;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import cn.hashdata.bireme.provider.Provider;
 
-import cn.hashdata.bireme.Provider.Transformer;
-
-/**
- * {@code Dispatcher} constantly poll {@code ChangeSet} and offer the {@code ChangeSet} to right
- * {@code Transformer}. After transformation complete, {@code Dispatcher} insert the result to
- * suitable {@code RowCache}.
- *
- * @author yuze
- *
- */
 public class Dispatcher implements Callable<Long> {
-  static final protected Long TIMEOUT_MS = 1000L;
+  public Context cxt;
+  public RowSet rowSet;
+  public boolean complete;
+  public LinkedBlockingQueue<Future<RowSet>> transResult;
+  public ConcurrentHashMap<String, RowCache> cache;
 
-  private Logger logger = LogManager.getLogger("Bireme." + Dispatcher.class);
-
-  protected Context cxt;
-  protected ChangeSet changeSet;
-  protected LinkedBlockingQueue<ChangeSet> changeSetIn;
-  protected ExecutorService transformerThreadPool;
-  protected CompletionService<RowSet> cs;
-  protected LinkedBlockingQueue<Future<RowSet>> results;
-  protected LinkedBlockingQueue<Transformer> transformers;
-
-  /**
-   * Create a new {@code Dispatcher}.
-   *
-   * @param cxt bireme context.
-   */
-  public Dispatcher(Context cxt) {
+  public Dispatcher(Context cxt, Provider pipeLine) {
     this.cxt = cxt;
-    changeSetIn = cxt.changeSetQueue;
-    transformerThreadPool = Executors.newFixedThreadPool(cxt.conf.transform_pool_size);
-    cs = new ExecutorCompletionService<RowSet>(transformerThreadPool);
-    results = new LinkedBlockingQueue<Future<RowSet>>(cxt.conf.trans_result_queue_size);
-    transformers = new LinkedBlockingQueue<Transformer>(cxt.conf.trans_result_queue_size);
+    this.rowSet = null;
+    this.complete = false;
+    this.transResult = pipeLine.transResult;
+    this.cache = pipeLine.cache;
   }
 
-  /**
-   * Call the {@code Dispatcher} to work.
-   */
-  public Long call() throws BiremeException, InterruptedException {
-    Thread.currentThread().setName("Dispatcher");
+  @Override
+  public Long call() throws BiremeException {
+    if (rowSet != null) {
+      complete = insertRowSet();
 
-    logger.info("Dispatcher Start.");
-
-    try {
-      while (!cxt.stop) {
-        do {
-          changeSet = changeSetIn.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
-          checkTansformResults();
-        } while (changeSet == null && !cxt.stop);
-
-        if (cxt.stop) {
-          break;
-        }
-
-        dispatch(changeSet);
+      if (!complete) {
+        return 0L;
       }
-    } catch (BiremeException e) {
-      logger.fatal("Dispatcher exit on error.");
-      logger.fatal("Stack Trace: ", e);
-      throw e;
-    } finally {
-      transformerThreadPool.shutdown();
     }
 
-    logger.info("Dispatcher exit.");
-    return 0L;
-  }
-
-  private void dispatch(ChangeSet changeSet) throws BiremeException, InterruptedException {
-    Transformer transformer = changeSet.provider.borrowTransformer(changeSet);
-    transformers.offer(transformer);
-    Future<RowSet> result = cs.submit(transformer);
-    boolean success;
-
-    do {
-      success = results.offer(result, TIMEOUT_MS, TimeUnit.MILLISECONDS);
-      checkTansformResults();
-    } while (!success && !cxt.stop);
-  }
-
-  private void checkTansformResults() throws BiremeException, InterruptedException {
-    RowSet rowSet = null;
-    while (!results.isEmpty() && !cxt.stop) {
-      Future<RowSet> head = results.peek();
+    while (!transResult.isEmpty() && !cxt.stop) {
+      Future<RowSet> head = transResult.peek();
 
       if (head.isDone()) {
-        results.remove();
-
-        Transformer trans = transformers.take();
-        Provider provider = trans.getProvider();
-        provider.returnTransformer(trans);
-
+        transResult.remove();
         try {
           rowSet = head.get();
         } catch (ExecutionException e) {
           throw new BiremeException("Transform failed.\n", e.getCause());
+        } catch (InterruptedException e) {
+          throw new BiremeException("Get Future<RowSet> failed, be interrupted", e);
         }
 
-        insertRowSet(rowSet);
+        complete = insertRowSet();
+
+        if (!complete) {
+          break;
+        }
       } else {
         break;
       }
     }
+
+    return 0L;
   }
 
-  private void insertRowSet(RowSet rowSet) throws BiremeException, InterruptedException {
+  private boolean insertRowSet() throws BiremeException {
     HashMap<String, ArrayList<Row>> bucket = rowSet.rowBucket;
-    ConcurrentHashMap<String, RowCache> tableCache = cxt.tableRowCache;
+    boolean complete = true;
 
     for (Entry<String, ArrayList<Row>> entry : bucket.entrySet()) {
       String fullTableName = entry.getKey();
       ArrayList<Row> rows = entry.getValue();
-      RowCache cache = tableCache.get(fullTableName);
-      cache.addRows(rows, rowSet.callback);
+      RowCache rowCache = cache.get(fullTableName);
+
+      if (rowCache == null) {
+        rowCache = new RowCache(cxt, fullTableName);
+        cache.put(fullTableName, rowCache);
+      }
+
+      complete = rowCache.addRows(rows, rowSet.callback);
+      if (!complete) {
+        break;
+      }
+
+      bucket.remove(fullTableName);
       cxt.idleRowArrays.returnObject(rows);
     }
-    cxt.idleRowSets.returnObject(rowSet);
+
+    if (complete) {
+      cxt.idleRowSets.returnObject(rowSet);
+      rowSet = null;
+    }
+
+    return complete;
   }
 }

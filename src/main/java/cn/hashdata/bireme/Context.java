@@ -8,16 +8,11 @@ import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map.Entry;
 import java.util.concurrent.CompletionService;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.daemon.DaemonController;
 import org.apache.commons.pool2.impl.GenericObjectPool;
@@ -30,6 +25,7 @@ import cn.hashdata.bireme.ChangeSet.ChangeSetFactory;
 import cn.hashdata.bireme.Row.RowArrayFactory;
 import cn.hashdata.bireme.Row.RowFactory;
 import cn.hashdata.bireme.RowSet.RowSetFactory;
+import cn.hashdata.bireme.provider.Provider;
 
 /**
  * bireme context.
@@ -49,8 +45,8 @@ public class Context {
   public HashMap<String, String> tableMap;
   public HashMap<String, Table> tablesInfo;
 
-  public LinkedBlockingQueue<ChangeSet> changeSetQueue;
-  public ConcurrentHashMap<String, RowCache> tableRowCache;
+  public ArrayList<Provider> pipeLines;
+
   public HashMap<String, ChangeLoader> changeLoaders;
   public LinkedBlockingQueue<Connection> loaderConnections;
   public HashMap<Connection, HashSet<String>> temporaryTables;
@@ -60,8 +56,11 @@ public class Context {
   public GenericObjectPool<Row> idleRows;
   public GenericObjectPool<ArrayList<Row>> idleRowArrays;
 
-  public ExecutorService threadPool;
-  public CompletionService<Long> cs;
+  public ExecutorService scheduleThread;
+  public ExecutorService transformerPool;
+  public ExecutorService dispatcherPool;
+  public ExecutorService mergerPool;
+
   public ExecutorService loaderThreadPool;
   public CompletionService<Long> loadercs;
 
@@ -69,29 +68,6 @@ public class Context {
   public WatchDog watchDog;
 
   public StateServer server;
-
-  static class WatchDog extends Thread {
-    private DaemonController controller;
-    private Context cxt;
-
-    public WatchDog(DaemonController controller, Context cxt) {
-      this.controller = controller;
-      this.cxt = cxt;
-      this.setDaemon(true);
-      this.setName("WatchDog");
-    }
-
-    @Override
-    public void run() {
-      try {
-        cxt.waitForComplete(false);
-      } catch (InterruptedException e) {
-        controller.fail("Service stopped by user");
-      } catch (Exception e) {
-        controller.fail(e);
-      }
-    }
-  }
 
   /**
    * Create a new bireme context.
@@ -116,13 +92,10 @@ public class Context {
     this.tableMap = conf.tableMap;
     this.tablesInfo = new HashMap<String, Table>();
 
-    this.changeSetQueue = new LinkedBlockingQueue<ChangeSet>(conf.changeset_queue_size);
-    this.tableRowCache = new ConcurrentHashMap<String, RowCache>();
-    initRowCache();
-
     this.changeLoaders = new HashMap<String, ChangeLoader>();
     this.loaderConnections = new LinkedBlockingQueue<Connection>(conf.loader_conn_size);
     this.temporaryTables = new HashMap<Connection, HashSet<String>>();
+    this.pipeLines = new ArrayList<Provider>();
 
     this.server = new StateServer(this, conf.state_server_addr, conf.state_server_port);
 
@@ -132,18 +105,7 @@ public class Context {
 
     if (!test) {
       createThreadPool();
-      registerGauge();
-    }
-  }
-
-  private void initRowCache() {
-    for (String fullTableName : tableMap.values()) {
-      if (tableRowCache.containsKey(fullTableName)) {
-        continue;
-      }
-
-      RowCache rowCache = new RowCache(this, fullTableName);
-      tableRowCache.put(fullTableName, rowCache);
+      // registerGauge();
     }
   }
 
@@ -166,10 +128,11 @@ public class Context {
   }
 
   private void createThreadPool() {
-    // #provider + #change set dispatcher + # task generator
-    threadPool = Executors.newFixedThreadPool(conf.dataSource.size() + AUX_THREAD);
-    cs = new ExecutorCompletionService<Long>(threadPool);
-
+    // TODO add pool size in config file
+    scheduleThread = Executors.newSingleThreadExecutor();
+    transformerPool = Executors.newFixedThreadPool(conf.transform_pool_size);
+    dispatcherPool = Executors.newFixedThreadPool(conf.transform_pool_size);
+    mergerPool = Executors.newFixedThreadPool(conf.merge_pool_size);
     // #loader
     loaderThreadPool = Executors.newFixedThreadPool(conf.loadersCount);
     loadercs = new ExecutorCompletionService<Long>(loaderThreadPool);
@@ -179,20 +142,46 @@ public class Context {
     metrics.register(MetricRegistry.name(Context.class, "ChangeSetQueue"), new Gauge<Integer>() {
       @Override
       public Integer getValue() {
-        return changeSetQueue.size();
+        // TODO return changeSetQueue.size();
+        return 0;
       }
     });
 
+    /* TODO
     for (Entry<String, RowCache> entry : tableRowCache.entrySet()) {
       String fullTableName = entry.getKey();
       RowCache rowCache = entry.getValue();
-      metrics.register(
-          MetricRegistry.name(RowCache.class, "for " + fullTableName), new Gauge<Integer>() {
+      metrics.register(MetricRegistry.name(RowCache.class, "for " + fullTableName),
+          new Gauge<Integer>() {
             @Override
             public Integer getValue() {
               return rowCache.rows.size();
             }
           });
+    }
+    */
+  }
+
+  static class WatchDog extends Thread {
+    private DaemonController controller;
+    private Context cxt;
+
+    public WatchDog(DaemonController controller, Context cxt) {
+      this.controller = controller;
+      this.cxt = cxt;
+      this.setDaemon(true);
+      this.setName("WatchDog");
+    }
+
+    @Override
+    public void run() {
+      try {
+        cxt.waitForComplete(false);
+      } catch (InterruptedException e) {
+        controller.fail("Service stopped by user");
+      } catch (Exception e) {
+        controller.fail(e);
+      }
     }
   }
 
@@ -209,6 +198,7 @@ public class Context {
    * @throws BiremeException thread exit abnormally
    */
   public void waitForComplete(boolean ignoreError) throws BiremeException, InterruptedException {
+    /*
     while (!threadPool.isTerminated() && !loaderThreadPool.isTerminated()) {
       Throwable cause = null;
 
@@ -272,6 +262,6 @@ public class Context {
           }
         }
       }
-    }
+    } */
   }
 }

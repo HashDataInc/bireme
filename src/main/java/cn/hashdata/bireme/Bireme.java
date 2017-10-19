@@ -11,8 +11,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map.Entry;
-import java.util.concurrent.Callable;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -27,6 +27,8 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.daemon.Daemon;
 import org.apache.commons.daemon.DaemonContext;
 import org.apache.commons.daemon.DaemonInitException;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.PartitionInfo;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -34,7 +36,9 @@ import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.JmxReporter;
 
 import cn.hashdata.bireme.provider.DebeziumProvider;
+import cn.hashdata.bireme.provider.KafkaProvider;
 import cn.hashdata.bireme.provider.MaxwellProvider;
+import cn.hashdata.bireme.provider.ProviderConfig;
 
 /**
  * {@code Bireme} is an incremental synchronization tool. It could sync update in MySQL to GreenPlum
@@ -148,28 +152,34 @@ public class Bireme implements Daemon {
     logger.info("Finishing establishing {} connections for loaders.", cxt.conf.loader_conn_size);
   }
 
-  protected void createMaxwellChangeProvider() {
-    for (int i = 0, len = cxt.conf.maxwellConf.size(); i < len; i++) {
-      Callable<Long> maxwellProvider = new MaxwellProvider(cxt, cxt.conf.maxwellConf.get(i));
-      cxt.cs.submit(maxwellProvider);
+  protected void createScheduler() {
+    Scheduler scheduler = new Scheduler(cxt);
+    cxt.scheduleThread.submit(scheduler);
+  }
+
+  protected void createPipeLine() {
+    for (ProviderConfig conf : cxt.conf.pipeLineConf) {
+      switch (conf.type) {
+        case MAXWELL:
+          KafkaConsumer<String, String> consumer =
+              KafkaProvider.createConsumer(conf.server, conf.groupID);
+          Iterator<PartitionInfo> iter = consumer.partitionsFor(conf.topic).iterator();
+
+          while (iter.hasNext()) {
+            cxt.pipeLines.add(new MaxwellProvider(cxt, conf, iter.next().partition()));
+          }
+          break;
+
+        case DEBEZIUM:
+          for (String sourceTable : conf.tableMap.keySet()) {
+            cxt.pipeLines.add(new DebeziumProvider(cxt, conf, sourceTable));
+          }
+          break;
+
+        default:
+          break;
+      }
     }
-  }
-
-  protected void createDebeziumProvider() {
-    for (int i = 0, len = cxt.conf.debeziumConf.size(); i < len; i++) {
-      Callable<Long> debeziumProvider = new DebeziumProvider(cxt, cxt.conf.debeziumConf.get(i));
-      cxt.cs.submit(debeziumProvider);
-    }
-  }
-
-  protected void createChangeDispatcher() {
-    Callable<Long> dispacher = new Dispatcher(cxt);
-    cxt.cs.submit(dispacher);
-  }
-
-  protected void createTaskGenerator() {
-    Callable<Long> taskGenerator = new TaskGenerator(cxt);
-    cxt.cs.submit(taskGenerator);
   }
 
   protected void createChangeLoaders() {
@@ -236,13 +246,16 @@ public class Bireme implements Daemon {
     }
 
     createChangeLoaders();
-    createTaskGenerator();
-    createChangeDispatcher();
-    createMaxwellChangeProvider();
-    createDebeziumProvider();
-    startReporter();
+    createPipeLine();
+    createScheduler();
+    // startReporter();
     cxt.server.start();
-
+    try {
+      Thread.sleep(10000000);
+    } catch (InterruptedException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
     if (context != null) {
       cxt.startWatchDog(context.getController());
     }
@@ -260,7 +273,6 @@ public class Bireme implements Daemon {
     logger.info("set stop flag to true");
 
     cxt.server.stop();
-    cxt.threadPool.shutdownNow();
     cxt.loaderThreadPool.shutdownNow();
 
     cxt.waitForComplete(true);
@@ -295,7 +307,6 @@ public class Bireme implements Daemon {
       logger.fatal("Stack Trace: ", e);
 
       cxt.stop = true;
-      cxt.threadPool.shutdownNow();
       cxt.loaderThreadPool.shutdownNow();
     }
 

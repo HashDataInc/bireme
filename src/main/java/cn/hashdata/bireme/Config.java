@@ -17,7 +17,7 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import cn.hashdata.bireme.provider.KafkaProvider.KafkaProviderConfig;
+import cn.hashdata.bireme.provider.ProviderConfig;
 import cn.hashdata.bireme.provider.ProviderConfig.SourceType;
 
 /**
@@ -34,9 +34,9 @@ public class Config {
   protected Configuration config;
 
   public String reporter;
-  public int changeset_queue_size;
+
   public int transform_pool_size;
-  public int trans_result_queue_size;
+  public int trans_queue_size;
   public int row_cache_size;
   public int merge_pool_size;
   public int merge_interval;
@@ -49,10 +49,7 @@ public class Config {
 
   public ConnectionConfig target;
 
-  public ArrayList<String> dataSource;
-  public ArrayList<String> dataSourceType;
-  public ArrayList<KafkaProviderConfig> maxwellConf;
-  public ArrayList<KafkaProviderConfig> debeziumConf;
+  public ArrayList<ProviderConfig> pipeLineConf;
   public HashMap<String, String> tableMap;
   public int loadersCount;
 
@@ -93,8 +90,7 @@ public class Config {
     state_server_port = config.getInt("state.server.port", 8080);
 
     transform_pool_size = config.getInt("transform.thread_pool.size", 10);
-    changeset_queue_size = transform_pool_size * 2;
-    trans_result_queue_size = transform_pool_size * 2;
+    trans_queue_size = transform_pool_size * 2;
 
     merge_pool_size = config.getInt("merge.thread_pool.size", 10);
     merge_interval = config.getInt("merge.interval", 10000);
@@ -104,11 +100,8 @@ public class Config {
     loader_conn_size = config.getInt("loader.conn_pool.size", 10);
     loader_task_queue_size = config.getInt("loader.task_queue.size", 2);
 
-    dataSource = new ArrayList<String>();
-    dataSourceType = new ArrayList<String>();
+    pipeLineConf = new ArrayList<ProviderConfig>();
     tableMap = new HashMap<String, String>();
-    maxwellConf = new ArrayList<KafkaProviderConfig>();
-    debeziumConf = new ArrayList<KafkaProviderConfig>();
   }
 
   protected void connectionConfig() throws BiremeException {
@@ -144,10 +137,10 @@ public class Config {
       throw new BiremeException(message);
     }
     for (int i = 0; i < sources.length; i++) {
-      dataSource.add(sources[i]);
+      pipeLineConf.add(new ProviderConfig(sources[i]));
     }
 
-    fetchProviderAndTableMap();
+    fetchPipeLineAndTableMap();
   }
 
   /**
@@ -156,28 +149,20 @@ public class Config {
    * @throws BiremeException wrap and throw Exception which cannot be handled
    * @throws ConfigurationException if an error occurred when loading the configuration
    */
-  protected void fetchProviderAndTableMap() throws BiremeException, ConfigurationException {
+  protected void fetchPipeLineAndTableMap() throws BiremeException, ConfigurationException {
     loadersCount = 0;
 
-    for (int i = 0; i < dataSource.size(); i++) {
-      String name = dataSource.get(i);
+    for (ProviderConfig conf : pipeLineConf) {
+      String name = conf.name;
       String type = config.getString(name + ".type");
-
-      dataSourceType.add(type);
 
       switch (type) {
         case "maxwell":
-          KafkaProviderConfig conf = fetchMaxwellConfig(name);
-          conf.type = SourceType.MAXWELL;
-          conf.tableMap = fetchTableMap(conf.name);
-          maxwellConf.add(conf);
+          fetchMaxwellConfig(name, conf);
           break;
 
         case "debezium":
-          KafkaProviderConfig dconf = fetchDebeziumConfig(name);
-          dconf.type = SourceType.DEBEZIUM;
-          dconf.tableMap = fetchTableMap(dconf.name);
-          debeziumConf.add(dconf);
+          fetchDebeziumConfig(name, conf);
           break;
 
         default:
@@ -185,6 +170,8 @@ public class Config {
           logger.fatal(message);
           throw new BiremeException(message);
       }
+
+      conf.tableMap = fetchTableMap(conf.name);
     }
 
     if (loader_conn_size > loadersCount) {
@@ -192,11 +179,11 @@ public class Config {
     }
   }
 
-  protected KafkaProviderConfig fetchDebeziumConfig(String prefix) throws BiremeException {
+  protected ProviderConfig fetchDebeziumConfig(String prefix, ProviderConfig debeziumConf)
+      throws BiremeException {
     Configuration subConfig = new SubsetConfiguration(config, prefix, ".");
-    KafkaProviderConfig debeziumConf = new KafkaProviderConfig();
 
-    debeziumConf.name = prefix;
+    debeziumConf.type = SourceType.DEBEZIUM;
     debeziumConf.server = subConfig.getString("kafka.server");
     debeziumConf.topic = prefix;
     debeziumConf.groupID = subConfig.getString("kafka.groupid", "bireme");
@@ -217,11 +204,11 @@ public class Config {
    * @return {@code MaxwellConfig} for {@code MaxwellProvider}
    * @throws BiremeException - miss some required configuration
    */
-  protected KafkaProviderConfig fetchMaxwellConfig(String prefix) throws BiremeException {
+  protected ProviderConfig fetchMaxwellConfig(String prefix, ProviderConfig maxwellConf)
+      throws BiremeException {
     Configuration subConfig = new SubsetConfiguration(config, prefix, ".");
-    KafkaProviderConfig maxwellConf = new KafkaProviderConfig();
 
-    maxwellConf.name = prefix;
+    maxwellConf.type = SourceType.MAXWELL;
     maxwellConf.server = subConfig.getString("kafka.server");
     maxwellConf.topic = subConfig.getString("kafka.topic");
     maxwellConf.groupID = subConfig.getString("kafka.groupid", "bireme");
@@ -275,22 +262,22 @@ public class Config {
    * Print log about bireme configuration.
    */
   public void logConfig() {
-    String config = "Configures: "
-        + "\n\tchangeSet queue size = " + changeset_queue_size + "\n\ttransform thread pool size = "
-        + transform_pool_size + "\n\ttransform result queue size = " + trans_result_queue_size
-        + "\n\trow cache size = " + row_cache_size + "\n\tmerge thread pool size = "
-        + merge_pool_size + "\n\tmerge interval = " + merge_interval
-        + "\n\tbatch size = " + batch_size + "\n\tloader conn size = " + loader_conn_size
-        + "\n\tloader task queue size = " + loader_task_queue_size
-        + "\n\treport interval = " + report_interval;
-    logger.info(config);
+    /*String config = "Configures: " + "\n\tchangeSet queue size = " + changeset_queue_size
+        + "\n\ttransform thread pool size = " + transform_pool_size
+        + "\n\ttransform result queue size = " + trans_queue_size + "\n\trow cache size = "
+        + row_cache_size + "\n\tmerge thread pool size = " + merge_pool_size
+        + "\n\tmerge interval = " + merge_interval + "\n\tbatch size = " + batch_size
+        + "\n\tloader conn size = " + loader_conn_size + "\n\tloader task queue size = "
+        + loader_task_queue_size + "\n\treport interval = " + report_interval;
+    logger.info(config);*/
 
     StringBuilder sb = new StringBuilder();
     sb.append("Data Source: \n");
 
+    /* TODO modify output
     for (int i = 0, len = dataSource.size(); i < len; i++) {
       sb.append("\tType: " + dataSourceType.get(i) + " Name: " + dataSource.get(i) + "\n");
-    }
+    } */
 
     logger.info(sb.toString());
   }

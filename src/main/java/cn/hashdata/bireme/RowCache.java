@@ -6,9 +6,11 @@ package cn.hashdata.bireme;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedList;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 
 /**
  * An in-memory cache for {@code Row}. We use cache to merge and load operations in batch.
@@ -21,13 +23,16 @@ public class RowCache {
   static final protected Long TIMEOUT_MS = 1000L;
 
   public Context cxt;
-  public Long lastTaskTime;
-  public String tableName;
+
+  private Long lastMergeTime;
+  private int mergeInterval;
+  private int batchSize;
+
   public LinkedBlockingQueue<Row> rows;
-  public LinkedBlockingQueue<CommitCallback> commitCallback;
-  public LinkedBlockingQueue<RowBatchMerger> rowBatchMergers;
-  public int mergeInterval;
-  public int batchSize;
+  private LinkedBlockingQueue<CommitCallback> commitCallback;
+
+  private LinkedList<RowBatchMerger> localMerger;
+  private LinkedBlockingQueue<Future<LoadTask>> taskIn;
 
   /**
    * Create cache for a destination table.
@@ -37,15 +42,21 @@ public class RowCache {
    */
   public RowCache(Context cxt, String tableName) {
     this.cxt = cxt;
-    this.tableName = tableName;
+
+    this.lastMergeTime = new Date().getTime();
     this.mergeInterval = cxt.conf.merge_interval;
     this.batchSize = cxt.conf.batch_size;
-    lastTaskTime = new Date().getTime();
 
     this.rows = new LinkedBlockingQueue<Row>(cxt.conf.batch_size * 2);
     this.commitCallback = new LinkedBlockingQueue<CommitCallback>();
-    this.rowBatchMergers =
-        new LinkedBlockingQueue<RowBatchMerger>(cxt.conf.row_cache_size / cxt.conf.batch_size);
+
+    ChangeLoader loader = cxt.changeLoaders.get(tableName);
+    this.taskIn = loader.taskIn;
+
+    this.localMerger = new LinkedList<RowBatchMerger>();
+    for (int i = 0; i < cxt.conf.loader_task_queue_size; i++) {
+      localMerger.add(new RowBatchMerger());
+    }
   }
 
   /**
@@ -57,82 +68,56 @@ public class RowCache {
    * @throws BiremeException Exception while borrow from pool
    * @throws InterruptedException if interrupted while waiting
    */
-  public void addRows(ArrayList<Row> newRows, CommitCallback callback)
-      throws BiremeException, InterruptedException {
-    createBatch();
+  public boolean addRows(ArrayList<Row> newRows, CommitCallback callback) throws BiremeException {
+    boolean success = false;
 
-    for (Row row : newRows) {
-      boolean success;
-
-      do {
-        success = rows.offer(row, TIMEOUT_MS, TimeUnit.MILLISECONDS);
-      } while (!success && !cxt.stop);
-
-      if (cxt.stop) {
-        break;
+    synchronized (rows) {
+      if (rows.remainingCapacity() < newRows.size()) {
+        return success;
       }
-    }
-    commitCallback.offer(callback);
 
-    createBatch();
+      success = rows.addAll(newRows) && commitCallback.offer(callback);
+    }
+
+    return success;
   }
 
-  /**
-   * Drain the cached {@code Rows} and return a batch of {@code Rows}. This method is executed once
-   * in a while or the cached Rows reach to a certain amount.
-   *
-   * @param interval The minimum time between two operations
-   * @param maxSize The amount condition to trigger the operation
-   * @return the drained array of {@code Rows}
-   * @throws BiremeException Exception while borrow from pool
-   * @throws InterruptedException if interrupted while waiting
-   */
-  private synchronized void createBatch() throws BiremeException, InterruptedException {
-    if (new Date().getTime() - lastTaskTime < mergeInterval && rows.size() < batchSize) {
-      return;
+  public boolean shouldMerge() {
+    if (new Date().getTime() - lastMergeTime < mergeInterval && rows.size() < batchSize) {
+      return false;
     }
-
-    if (rows.isEmpty()) {
-      return;
-    }
-
-    ArrayList<Row> rows = null;
-
-    try {
-      rows = cxt.idleRowArrays.borrowObject();
-    } catch (Exception e) {
-      String message = "Can't not borrow RowArrays from the Object Pool.\n";
-      throw new BiremeException(message, e);
-    }
-
-    this.rows.drainTo(rows);
-    ArrayList<CommitCallback> callbacks = new ArrayList<CommitCallback>();
-    this.commitCallback.drainTo(callbacks);
-    RowBatchMerger batch = new RowBatchMerger(cxt, tableName, rows, callbacks);
-
-    boolean success;
-
-    do {
-      success = rowBatchMergers.offer(batch, TIMEOUT_MS, TimeUnit.MILLISECONDS);
-    } while (!success && !cxt.stop);
-
-    lastTaskTime = new Date().getTime();
+    return true;
   }
 
-  /**
-   * Fetch a batch of rows from cache
-   *
-   * @return the batch
-   * @throws InterruptedException if interrupted while waiting
-   * @throws BiremeException - Exception while borrow from pool
-   */
-  public RowBatchMerger fetchBatch() throws BiremeException, InterruptedException {
-    createBatch();
+  public void startMerge() throws BiremeException {
+    synchronized (taskIn) {
+      if (taskIn.remainingCapacity() == 0 || rows.isEmpty()) {
+        return;
+      }
 
-    RowBatchMerger batch = null;
-    batch = rowBatchMergers.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+      ArrayList<CommitCallback> callbacks = new ArrayList<CommitCallback>();
+      ArrayList<Row> batch = null;
 
-    return batch;
+      try {
+        batch = cxt.idleRowArrays.borrowObject();
+      } catch (Exception e) {
+        String message = "Can't not borrow RowArrays from the Object Pool.\n";
+        throw new BiremeException(message, e);
+      }
+
+      synchronized (rows) {
+        rows.drainTo(batch);
+        commitCallback.drainTo(callbacks);
+      }
+
+      RowBatchMerger merger = localMerger.remove();
+      merger.setBatch(batch, callbacks);
+
+      ExecutorService mergerPool = cxt.mergerPool;
+      Future<LoadTask> task = mergerPool.submit(merger);
+      taskIn.add(task);
+      localMerger.add(merger);
+    }
   }
 
   /**
@@ -143,10 +128,8 @@ public class RowCache {
    *
    */
   public class RowBatchMerger implements Callable<LoadTask> {
-    protected String mappedTableName;
     protected ArrayList<Row> rows;
     protected ArrayList<CommitCallback> callbacks;
-    protected Context cxt;
 
     /**
      * Create a RowBatchMerger.
@@ -156,10 +139,9 @@ public class RowCache {
      * @param rows batch of {@code Rows} to be merged
      * @param callbacks the {@code CommitCallbacks} in this batch.
      */
-    public RowBatchMerger(Context cxt, String mappedTableName, ArrayList<Row> rows,
-        ArrayList<CommitCallback> callbacks) {
-      this.cxt = cxt;
-      this.mappedTableName = mappedTableName;
+    public RowBatchMerger() {}
+
+    public void setBatch(ArrayList<Row> rows, ArrayList<CommitCallback> callbacks) {
       this.rows = rows;
       this.callbacks = callbacks;
     }
@@ -168,9 +150,7 @@ public class RowCache {
      * Run the {@code RowBatchMerger}.
      */
     public LoadTask call() {
-      Thread.currentThread().setName("RowBatchMerger");
-
-      LoadTask task = new LoadTask(mappedTableName);
+      LoadTask task = new LoadTask();
       LoadState state = task.loadState;
 
       for (Row row : rows) {

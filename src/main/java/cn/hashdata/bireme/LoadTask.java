@@ -16,7 +16,6 @@ import java.util.HashSet;
  *
  */
 public class LoadTask {
-  public String tableName;
   public ArrayList<CommitCallback> callbacks;
   public LoadState loadState;
   public HashSet<String> delete;
@@ -27,8 +26,7 @@ public class LoadTask {
    *
    * @param tableName the table this task will be loaded to.
    */
-  public LoadTask(String tableName) {
-    this.tableName = tableName;
+  public LoadTask() {
     this.callbacks = new ArrayList<CommitCallback>();
     this.loadState = new LoadState();
     this.delete = new HashSet<String>();
@@ -36,7 +34,6 @@ public class LoadTask {
   }
 
   public void reset() {
-    tableName = null;
     callbacks.clear();
     delete.clear();
     insert.clear();
