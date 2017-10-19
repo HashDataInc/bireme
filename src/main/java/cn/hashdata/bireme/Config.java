@@ -17,8 +17,8 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import cn.hashdata.bireme.provider.ProviderConfig;
-import cn.hashdata.bireme.provider.ProviderConfig.SourceType;
+import cn.hashdata.bireme.provider.SourceConfig;
+import cn.hashdata.bireme.provider.SourceConfig.SourceType;
 
 /**
  * Configurations about bireme.
@@ -31,27 +31,33 @@ public class Config {
 
   private Logger logger = LogManager.getLogger("Bireme." + Config.class);
 
-  protected Configuration config;
-
-  public String reporter;
+  private Configuration config;
 
   public int transform_pool_size;
-  public int trans_queue_size;
+  public int transform_queue_size;
+
+  public int dispatch_pool_size;
+
   public int row_cache_size;
+
   public int merge_pool_size;
   public int merge_interval;
   public int batch_size;
+
   public int loader_conn_size;
   public int loader_task_queue_size;
+  public int loadersCount;
+
+  public String reporter;
   public int report_interval;
+
   public String state_server_addr;
   public int state_server_port;
 
-  public ConnectionConfig target;
+  public ConnectionConfig targetDatabase;
 
-  public ArrayList<ProviderConfig> pipeLineConf;
+  public ArrayList<SourceConfig> sourceConfig;
   public HashMap<String, String> tableMap;
-  public int loadersCount;
 
   public static class ConnectionConfig {
     public String jdbcUrl;
@@ -76,23 +82,19 @@ public class Config {
     config = configs.properties(new File(configFile));
 
     basicConfig();
-    connectionConfig();
+    connectionConfig("target");
     dataSourceConfig();
 
     logConfig();
   }
 
   protected void basicConfig() {
-    reporter = config.getString("metrics.reporter", "console");
-    report_interval = config.getInt("metrics.reporter.console.interval", 15);
+    transform_pool_size = config.getInt("transform.threadPool.size", 10);
+    transform_queue_size = config.getInt("transform.resultQueue.size", 10);
 
-    state_server_addr = config.getString("state.server.addr", "0.0.0.0");
-    state_server_port = config.getInt("state.server.port", 8080);
+    dispatch_pool_size = config.getInt("dispatch.threadPool.size", 10);
 
-    transform_pool_size = config.getInt("transform.thread_pool.size", 10);
-    trans_queue_size = transform_pool_size * 2;
-
-    merge_pool_size = config.getInt("merge.thread_pool.size", 10);
+    merge_pool_size = config.getInt("merge.threadPool.size", 10);
     merge_interval = config.getInt("merge.interval", 10000);
     batch_size = config.getInt("merge.batch.size", 50000);
     row_cache_size = batch_size * 2;
@@ -100,16 +102,14 @@ public class Config {
     loader_conn_size = config.getInt("loader.conn_pool.size", 10);
     loader_task_queue_size = config.getInt("loader.task_queue.size", 2);
 
-    pipeLineConf = new ArrayList<ProviderConfig>();
-    tableMap = new HashMap<String, String>();
-  }
+    reporter = config.getString("metrics.reporter", "console");
+    report_interval = config.getInt("metrics.reporter.console.interval", 15);
 
-  protected void connectionConfig() throws BiremeException {
-    target = getConnConfig("target");
-    if (target.jdbcUrl == null) {
-      String message = "Please designate url for target Database.";
-      throw new BiremeException(message);
-    }
+    state_server_addr = config.getString("state.server.addr", "0.0.0.0");
+    state_server_port = config.getInt("state.server.port", 8080);
+
+    sourceConfig = new ArrayList<SourceConfig>();
+    tableMap = new HashMap<String, String>();
   }
 
   /**
@@ -117,16 +117,20 @@ public class Config {
    *
    * @param prefix "target" database
    * @return {@code ConnectionConfig} to database.
+   * @throws BiremeException when url of database is null
    */
-  protected ConnectionConfig getConnConfig(String prefix) {
-    Configuration subConfig = new SubsetConfiguration(config, prefix, ".");
-    ConnectionConfig connectionConfig = new ConnectionConfig();
+  protected void connectionConfig(String prefix) throws BiremeException {
+    Configuration subConfig = new SubsetConfiguration(config, "target", ".");
+    targetDatabase = new ConnectionConfig();
 
-    connectionConfig.jdbcUrl = subConfig.getString("url");
-    connectionConfig.user = subConfig.getString("user");
-    connectionConfig.passwd = subConfig.getString("passwd");
+    targetDatabase.jdbcUrl = subConfig.getString("url");
+    targetDatabase.user = subConfig.getString("user");
+    targetDatabase.passwd = subConfig.getString("passwd");
 
-    return connectionConfig;
+    if (targetDatabase.jdbcUrl == null) {
+      String message = "Please designate url for target Database.";
+      throw new BiremeException(message);
+    }
   }
 
   protected void dataSourceConfig() throws BiremeException, ConfigurationException {
@@ -137,36 +141,35 @@ public class Config {
       throw new BiremeException(message);
     }
     for (int i = 0; i < sources.length; i++) {
-      pipeLineConf.add(new ProviderConfig(sources[i]));
+      sourceConfig.add(new SourceConfig(sources[i]));
     }
 
-    fetchPipeLineAndTableMap();
+    fetchSourceAndTableMap();
   }
 
   /**
    * Get the {@code Provider} configuration.
    *
-   * @throws BiremeException wrap and throw Exception which cannot be handled
+   * @throws BiremeException miss some required configuration
    * @throws ConfigurationException if an error occurred when loading the configuration
    */
-  protected void fetchPipeLineAndTableMap() throws BiremeException, ConfigurationException {
+  protected void fetchSourceAndTableMap() throws BiremeException, ConfigurationException {
     loadersCount = 0;
 
-    for (ProviderConfig conf : pipeLineConf) {
-      String name = conf.name;
-      String type = config.getString(name + ".type");
+    for (SourceConfig conf : sourceConfig) {
+      String type = config.getString(conf.name + ".type");
 
       switch (type) {
         case "maxwell":
-          fetchMaxwellConfig(name, conf);
+          fetchMaxwellConfig(conf);
           break;
 
         case "debezium":
-          fetchDebeziumConfig(name, conf);
+          fetchDebeziumConfig(conf);
           break;
 
         default:
-          String message = "Unrecognized type for data source " + name;
+          String message = "Unrecognized type for data source " + conf.name;
           logger.fatal(message);
           throw new BiremeException(message);
       }
@@ -179,8 +182,14 @@ public class Config {
     }
   }
 
-  protected ProviderConfig fetchDebeziumConfig(String prefix, ProviderConfig debeziumConf)
-      throws BiremeException {
+  /**
+   * Get DebeziumSource configuration.
+   *
+   * @param debeziumConf An empty {@code SourceConfig}
+   * @throws BiremeException miss some required configuration
+   */
+  protected void fetchDebeziumConfig(SourceConfig debeziumConf) throws BiremeException {
+    String prefix = debeziumConf.name;
     Configuration subConfig = new SubsetConfiguration(config, prefix, ".");
 
     debeziumConf.type = SourceType.DEBEZIUM;
@@ -193,19 +202,16 @@ public class Config {
       logger.fatal(message);
       throw new BiremeException(message);
     }
-
-    return debeziumConf;
   }
 
   /**
-   * Get {@code MaxwellProvider} configuration.
+   * Get MaxwellConfig configuration.
    *
-   * @param prefix the Provider's name
-   * @return {@code MaxwellConfig} for {@code MaxwellProvider}
-   * @throws BiremeException - miss some required configuration
+   * @param maxwellConf an empty {@code SourceConfig}
+   * @throws BiremeException miss some required configuration
    */
-  protected ProviderConfig fetchMaxwellConfig(String prefix, ProviderConfig maxwellConf)
-      throws BiremeException {
+  protected void fetchMaxwellConfig(SourceConfig maxwellConf) throws BiremeException {
+    String prefix = maxwellConf.name;
     Configuration subConfig = new SubsetConfiguration(config, prefix, ".");
 
     maxwellConf.type = SourceType.MAXWELL;
@@ -222,8 +228,6 @@ public class Config {
       String message = "Please designate topic for " + prefix + ".";
       throw new BiremeException(message);
     }
-
-    return maxwellConf;
   }
 
   private HashMap<String, String> fetchTableMap(String dataSource)
@@ -262,22 +266,24 @@ public class Config {
    * Print log about bireme configuration.
    */
   public void logConfig() {
-    /*String config = "Configures: " + "\n\tchangeSet queue size = " + changeset_queue_size
-        + "\n\ttransform thread pool size = " + transform_pool_size
-        + "\n\ttransform result queue size = " + trans_queue_size + "\n\trow cache size = "
-        + row_cache_size + "\n\tmerge thread pool size = " + merge_pool_size
-        + "\n\tmerge interval = " + merge_interval + "\n\tbatch size = " + batch_size
-        + "\n\tloader conn size = " + loader_conn_size + "\n\tloader task queue size = "
-        + loader_task_queue_size + "\n\treport interval = " + report_interval;
-    logger.info(config);*/
+    String config = "Configures: " + "\n\ttransform thread pool size = " + transform_pool_size
+        + "\n\ttransform queue size = " + transform_queue_size + "\n\tdispatch thread pool size = "
+        + dispatch_pool_size + "\n\trow cache size = " + row_cache_size
+        + "\n\tmerge thread pool size = " + merge_pool_size + "\n\tmerge interval = "
+        + merge_interval + "\n\tbatch size = " + batch_size + "\n\tloader connection size = "
+        + loader_conn_size + "\n\tloader task queue size = " + loader_task_queue_size
+        + "\n\tloaders count = " + loadersCount + "\n\treporter = " + reporter
+        + "\n\treport interval = " + report_interval + "\n\tstate server addr = "
+        + state_server_addr + "\n\tstate server port = " + state_server_port
+        + "\n\ttarget database url = " + targetDatabase.jdbcUrl;
+
+    logger.info(config);
 
     StringBuilder sb = new StringBuilder();
     sb.append("Data Source: \n");
-
-    /* TODO modify output
-    for (int i = 0, len = dataSource.size(); i < len; i++) {
-      sb.append("\tType: " + dataSourceType.get(i) + " Name: " + dataSource.get(i) + "\n");
-    } */
+    for (SourceConfig conf : sourceConfig) {
+      sb.append("\tType: " + conf.type.name() + " Name: " + conf.name + "\n");
+    }
 
     logger.info(sb.toString());
   }

@@ -20,7 +20,7 @@ import cn.hashdata.bireme.Table;
 import cn.hashdata.bireme.Row.RowType;
 
 public class MaxwellProvider extends KafkaProvider {
-  public MaxwellProvider(Context cxt, ProviderConfig conf, int partitionID) {
+  public MaxwellProvider(Context cxt, SourceConfig conf, int partitionID) {
     super(cxt, conf);
     consumer.assign(Arrays.asList(new TopicPartition(conf.topic, partitionID)));
   }

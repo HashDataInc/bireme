@@ -23,7 +23,7 @@ public abstract class KafkaProvider extends Provider {
   protected KafkaConsumer<String, String> consumer;
   protected LinkedBlockingQueue<KafkaCommitCallback> commitCallbacks;
 
-  public KafkaProvider(Context cxt, ProviderConfig conf) {
+  public KafkaProvider(Context cxt, SourceConfig conf) {
     super(cxt, conf);
     consumer = KafkaProvider.createConsumer(conf.server, conf.groupID);
     commitCallbacks = new LinkedBlockingQueue<KafkaCommitCallback>();

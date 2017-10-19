@@ -30,7 +30,7 @@ import cn.hashdata.bireme.Table;
 import cn.hashdata.bireme.Row.RowType;
 
 public class DebeziumProvider extends KafkaProvider {
-  public DebeziumProvider(Context cxt, ProviderConfig conf, String topic) {
+  public DebeziumProvider(Context cxt, SourceConfig conf, String topic) {
     super(cxt, conf);
     List<TopicPartition> topicPartition =
         consumer.partitionsFor(topic)

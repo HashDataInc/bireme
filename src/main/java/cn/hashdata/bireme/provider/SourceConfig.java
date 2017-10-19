@@ -6,7 +6,7 @@ package cn.hashdata.bireme.provider;
 
 import java.util.HashMap;
 
-public class ProviderConfig {
+public class SourceConfig {
   public enum SourceType { MAXWELL, DEBEZIUM }
 
   public String name;
@@ -18,7 +18,7 @@ public class ProviderConfig {
   public String server;
   public String groupID;
 
-  public ProviderConfig(String name) {
+  public SourceConfig(String name) {
     this.name = name;
   }
 }

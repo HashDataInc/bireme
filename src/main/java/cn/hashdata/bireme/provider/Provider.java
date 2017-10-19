@@ -23,7 +23,7 @@ import cn.hashdata.bireme.Table;
 
 public abstract class Provider {
   public Context cxt;
-  public ProviderConfig conf;
+  public SourceConfig conf;
 
   public LinkedBlockingQueue<Future<RowSet>> transResult;
   private LinkedList<Transformer> localTransformer;
@@ -33,7 +33,7 @@ public abstract class Provider {
 
   public ConcurrentHashMap<String, RowCache> cache; // TODO key target table
 
-  public Provider(Context cxt, ProviderConfig conf) {
+  public Provider(Context cxt, SourceConfig conf) {
     this.cxt = cxt;
     this.conf = conf;
 

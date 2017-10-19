@@ -38,7 +38,7 @@ import com.codahale.metrics.JmxReporter;
 import cn.hashdata.bireme.provider.DebeziumProvider;
 import cn.hashdata.bireme.provider.KafkaProvider;
 import cn.hashdata.bireme.provider.MaxwellProvider;
-import cn.hashdata.bireme.provider.ProviderConfig;
+import cn.hashdata.bireme.provider.SourceConfig;
 
 /**
  * {@code Bireme} is an incremental synchronization tool. It could sync update in MySQL to GreenPlum
@@ -96,7 +96,7 @@ public class Bireme implements Daemon {
     logger.info("Start getting metadata of target tables from target database.");
 
     String[] strArray;
-    Connection conn = BiremeUtility.jdbcConn(cxt.conf.target);
+    Connection conn = BiremeUtility.jdbcConn(cxt.conf.targetDatabase);
 
     for (String fullname : cxt.tableMap.values()) {
       if (cxt.tablesInfo.containsKey(fullname)) {
@@ -124,7 +124,7 @@ public class Bireme implements Daemon {
 
     try {
       for (int i = 0, number = cxt.conf.loader_conn_size; i < number; i++) {
-        conn = BiremeUtility.jdbcConn(cxt.conf.target);
+        conn = BiremeUtility.jdbcConn(cxt.conf.targetDatabase);
         conn.setAutoCommit(true);
         Statement stmt = conn.createStatement();
         stmt.execute("set enable_nestloop = on;");
@@ -158,7 +158,7 @@ public class Bireme implements Daemon {
   }
 
   protected void createPipeLine() {
-    for (ProviderConfig conf : cxt.conf.pipeLineConf) {
+    for (SourceConfig conf : cxt.conf.sourceConfig) {
       switch (conf.type) {
         case MAXWELL:
           KafkaConsumer<String, String> consumer =
