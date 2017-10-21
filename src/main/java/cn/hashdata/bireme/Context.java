@@ -8,24 +8,26 @@ import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.concurrent.CompletionService;
-import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.daemon.DaemonController;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
-import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
 
 import cn.hashdata.bireme.ChangeSet.ChangeSetFactory;
 import cn.hashdata.bireme.Row.RowArrayFactory;
 import cn.hashdata.bireme.Row.RowFactory;
 import cn.hashdata.bireme.RowSet.RowSetFactory;
-import cn.hashdata.bireme.provider.Provider;
+import cn.hashdata.bireme.provider.PipeLine;
 
 /**
  * bireme context.
@@ -35,7 +37,6 @@ import cn.hashdata.bireme.provider.Provider;
  */
 public class Context {
   static final protected Long TIMEOUT_MS = 1000L;
-  static final protected int AUX_THREAD = 3;
 
   public volatile boolean stop = false;
 
@@ -45,9 +46,6 @@ public class Context {
   public HashMap<String, String> tableMap;
   public HashMap<String, Table> tablesInfo;
 
-  public ArrayList<Provider> pipeLines;
-
-  public HashMap<String, ChangeLoader> changeLoaders;
   public LinkedBlockingQueue<Connection> loaderConnections;
   public HashMap<Connection, HashSet<String>> temporaryTables;
 
@@ -56,57 +54,43 @@ public class Context {
   public GenericObjectPool<Row> idleRows;
   public GenericObjectPool<ArrayList<Row>> idleRowArrays;
 
-  public ExecutorService scheduleThread;
+  public ArrayList<PipeLine> pipeLines;
+
+  public ExecutorService schedule;
+  public Future<Long> scheduleResult;
+  public ExecutorService pipeLinePool;
   public ExecutorService transformerPool;
-  public ExecutorService dispatcherPool;
   public ExecutorService mergerPool;
+  public ExecutorService loaderPool;
 
-  public ExecutorService loaderThreadPool;
-  public CompletionService<Long> loadercs;
-
-  public int exitLoaders;
   public WatchDog watchDog;
 
-  public StateServer server;
+  // public StateServer server;
 
-  /**
-   * Create a new bireme context.
-   *
-   * @param conf bireme configuration
-   * @throws BiremeException Unknown Host
-   */
-  public Context(Config conf) throws BiremeException {
-    this(conf, false);
-  }
 
   /**
    * Create a new bireme context for test.
    *
    * @param conf bireme configuration
-   * @param test unitest or not
    * @throws BiremeException Unknown Host
    */
-  public Context(Config conf, Boolean test) throws BiremeException {
+  public Context(Config conf) throws BiremeException {
     this.conf = conf;
 
     this.tableMap = conf.tableMap;
     this.tablesInfo = new HashMap<String, Table>();
 
-    this.changeLoaders = new HashMap<String, ChangeLoader>();
     this.loaderConnections = new LinkedBlockingQueue<Connection>(conf.loader_conn_size);
     this.temporaryTables = new HashMap<Connection, HashSet<String>>();
-    this.pipeLines = new ArrayList<Provider>();
 
-    this.server = new StateServer(this, conf.state_server_addr, conf.state_server_port);
+    this.pipeLines = new ArrayList<PipeLine>();
+    this.schedule = Executors.newSingleThreadExecutor(new BiremeThreadFactory("Scheduler"));
 
-    exitLoaders = 0;
+    // this.server = new StateServer(this, conf.state_server_addr, conf.state_server_port);
 
     createObjectPool();
-
-    if (!test) {
-      createThreadPool();
-      // registerGauge();
-    }
+    createThreadPool();
+    registerGauge();
   }
 
   private void createObjectPool() {
@@ -128,38 +112,18 @@ public class Context {
   }
 
   private void createThreadPool() {
-    // TODO add pool size in config file
-    scheduleThread = Executors.newSingleThreadExecutor();
-    transformerPool = Executors.newFixedThreadPool(conf.transform_pool_size);
-    dispatcherPool = Executors.newFixedThreadPool(conf.transform_pool_size);
-    mergerPool = Executors.newFixedThreadPool(conf.merge_pool_size);
-    // #loader
-    loaderThreadPool = Executors.newFixedThreadPool(conf.loadersCount);
-    loadercs = new ExecutorCompletionService<Long>(loaderThreadPool);
+    pipeLinePool =
+        Executors.newFixedThreadPool(conf.pipeline_pool_size, new BiremeThreadFactory("PipeLine"));
+    transformerPool = Executors.newFixedThreadPool(conf.transform_pool_size,
+        new BiremeThreadFactory("Dispatcher"));
+    mergerPool =
+        Executors.newFixedThreadPool(conf.merge_pool_size, new BiremeThreadFactory("Merger"));
+    loaderPool =
+        Executors.newFixedThreadPool(conf.loader_conn_size, new BiremeThreadFactory("Loader"));
   }
 
   private void registerGauge() {
-    metrics.register(MetricRegistry.name(Context.class, "ChangeSetQueue"), new Gauge<Integer>() {
-      @Override
-      public Integer getValue() {
-        // TODO return changeSetQueue.size();
-        return 0;
-      }
-    });
-
-    /* TODO
-    for (Entry<String, RowCache> entry : tableRowCache.entrySet()) {
-      String fullTableName = entry.getKey();
-      RowCache rowCache = entry.getValue();
-      metrics.register(MetricRegistry.name(RowCache.class, "for " + fullTableName),
-          new Gauge<Integer>() {
-            @Override
-            public Integer getValue() {
-              return rowCache.rows.size();
-            }
-          });
-    }
-    */
+    // TODO
   }
 
   static class WatchDog extends Thread {
@@ -176,7 +140,7 @@ public class Context {
     @Override
     public void run() {
       try {
-        cxt.waitForComplete(false);
+        cxt.waitForStop();
       } catch (InterruptedException e) {
         controller.fail("Service stopped by user");
       } catch (Exception e) {
@@ -190,78 +154,67 @@ public class Context {
     watchDog.start();
   }
 
+  public void startScheduler() {
+    scheduleResult = schedule.submit(new Scheduler(this));
+    // server.start();
+  }
+
   /**
    * Wait for all threads to exit.
    *
    * @param ignoreError whether to ignore error.
    * @throws InterruptedException if interrupted while waiting
-   * @throws BiremeException thread exit abnormally
+   * @throws BiremeException Schedule Exception
    */
-  public void waitForComplete(boolean ignoreError) throws BiremeException, InterruptedException {
-    /*
-    while (!threadPool.isTerminated() && !loaderThreadPool.isTerminated()) {
-      Throwable cause = null;
+  public void waitForStop() throws InterruptedException, BiremeException {
 
-      if (!threadPool.isTerminated()) {
-        Future<Long> result = cs.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
-
-        if (result != null) {
-          try {
-            result.get();
-          } catch (ExecutionException e) {
-            cause = e.getCause();
-          }
-        }
-
-        if (cause != null && !ignoreError) {
-          try {
-            throw cause;
-          } catch (BiremeException | InterruptedException | RuntimeException e) {
-            throw e;
-          } catch (Throwable e) {
-            throw new BiremeException(e.getMessage(), e);
-          }
-        }
+    try {
+      while (!scheduleResult.isDone()) {
+        Thread.sleep(1);
       }
+      scheduleResult.get();
+    } catch (ExecutionException e) {
+      throw new BiremeException("Schedule Exception.", e.getCause());
+    } finally {
+      schedule.shutdownNow();
+      pipeLinePool.shutdownNow();
+      transformerPool.shutdownNow();
+      mergerPool.shutdownNow();
+      loaderPool.shutdownNow();
+    }
+  }
+  
+  public void waitForExit() {
+    try {
+      schedule.awaitTermination(1, TimeUnit.MINUTES);
+      pipeLinePool.awaitTermination(1, TimeUnit.MINUTES);
+      transformerPool.awaitTermination(1, TimeUnit.MINUTES);
+      mergerPool.awaitTermination(1, TimeUnit.MINUTES);
+      loaderPool.awaitTermination(1, TimeUnit.MINUTES);
+    } catch (InterruptedException ignore) {
+    }
+    
+  }
+}
 
-      if (!loaderThreadPool.isTerminated()) {
-        Future<Long> loaderResult = loadercs.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
 
-        if (loaderResult != null) {
-          try {
-            loaderResult.get();
-          } catch (ExecutionException e) {
-            cause = e.getCause();
-          } finally {
-            exitLoaders++;
-          }
+class BiremeThreadFactory implements ThreadFactory {
+  private final ThreadGroup group;
+  private final AtomicInteger threadNumber = new AtomicInteger(1);
+  private final String namePrefix;
 
-          if (exitLoaders == conf.loadersCount) {
-            for (Connection conn : loaderConnections) {
-              try {
-                conn.close();
-              } catch (Exception ignore) {
-              }
-            }
+  BiremeThreadFactory(String poolName) {
+    SecurityManager s = System.getSecurityManager();
+    group = (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
+    namePrefix = "pool-" + poolName + "-thread-";
+  }
 
-            loaderConnections.clear();
-
-            if (!stop) {
-              throw new BiremeException("All loaders failed.");
-            }
-          }
-        }
-
-        if (cause != null && !ignoreError) {
-          try {
-            throw cause;
-          } catch (BiremeException | InterruptedException | RuntimeException e) {
-            throw e;
-          } catch (Throwable e) {
-            throw new BiremeException(e.getMessage(), e);
-          }
-        }
-      }
-    } */
+  public Thread newThread(Runnable r) {
+    Thread t = new Thread(group, r, namePrefix + threadNumber.getAndIncrement(), 0);
+    if (t.isDaemon())
+      t.setDaemon(false);
+    if (t.getPriority() != Thread.NORM_PRIORITY)
+      t.setPriority(Thread.NORM_PRIORITY);
+    return t;
   }
 }

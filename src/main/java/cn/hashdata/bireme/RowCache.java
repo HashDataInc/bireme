@@ -8,9 +8,13 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+
+import cn.hashdata.bireme.provider.PipeLine;
+import cn.hashdata.bireme.provider.PipeLine.PipeLineState;
 
 /**
  * An in-memory cache for {@code Row}. We use cache to merge and load operations in batch.
@@ -23,6 +27,7 @@ public class RowCache {
   static final protected Long TIMEOUT_MS = 1000L;
 
   public Context cxt;
+  public PipeLine pipeLine;
 
   private Long lastMergeTime;
   private int mergeInterval;
@@ -32,7 +37,9 @@ public class RowCache {
   private LinkedBlockingQueue<CommitCallback> commitCallback;
 
   private LinkedList<RowBatchMerger> localMerger;
-  private LinkedBlockingQueue<Future<LoadTask>> taskIn;
+  public LinkedBlockingQueue<Future<LoadTask>> taskOut;
+  public ChangeLoader loader;
+  public Future<Long> loadResult;
 
   /**
    * Create cache for a destination table.
@@ -40,8 +47,9 @@ public class RowCache {
    * @param cxt The bireme context.
    * @param tableName The table name to cached.
    */
-  public RowCache(Context cxt, String tableName) {
+  public RowCache(Context cxt, String tableName, PipeLine pipeLine) {
     this.cxt = cxt;
+    this.pipeLine = pipeLine;
 
     this.lastMergeTime = new Date().getTime();
     this.mergeInterval = cxt.conf.merge_interval;
@@ -50,13 +58,13 @@ public class RowCache {
     this.rows = new LinkedBlockingQueue<Row>(cxt.conf.batch_size * 2);
     this.commitCallback = new LinkedBlockingQueue<CommitCallback>();
 
-    ChangeLoader loader = cxt.changeLoaders.get(tableName);
-    this.taskIn = loader.taskIn;
-
     this.localMerger = new LinkedList<RowBatchMerger>();
     for (int i = 0; i < cxt.conf.loader_task_queue_size; i++) {
       localMerger.add(new RowBatchMerger());
     }
+
+    this.taskOut = new LinkedBlockingQueue<Future<LoadTask>>(cxt.conf.loader_task_queue_size);
+    this.loader = new ChangeLoader(cxt, tableName, taskOut);
   }
 
   /**
@@ -65,21 +73,19 @@ public class RowCache {
    *
    * @param newRows the array of {@code Rows}
    * @param callback the corresponding {@code CommitCallback}
-   * @throws BiremeException Exception while borrow from pool
-   * @throws InterruptedException if interrupted while waiting
+   * @throws BiremeException when cache has enough but cannot add to cache
    */
-  public boolean addRows(ArrayList<Row> newRows, CommitCallback callback) throws BiremeException {
-    boolean success = false;
-
+  public boolean addRows(ArrayList<Row> newRows, CommitCallback callback) {
     synchronized (rows) {
       if (rows.remainingCapacity() < newRows.size()) {
-        return success;
+        return false;
       }
 
-      success = rows.addAll(newRows) && commitCallback.offer(callback);
+      rows.addAll(newRows);
+      commitCallback.offer(callback);
     }
 
-    return success;
+    return true;
   }
 
   public boolean shouldMerge() {
@@ -90,8 +96,8 @@ public class RowCache {
   }
 
   public void startMerge() throws BiremeException {
-    synchronized (taskIn) {
-      if (taskIn.remainingCapacity() == 0 || rows.isEmpty()) {
+    synchronized (taskOut) {
+      if (taskOut.remainingCapacity() == 0 || rows.isEmpty()) {
         return;
       }
 
@@ -115,8 +121,33 @@ public class RowCache {
 
       ExecutorService mergerPool = cxt.mergerPool;
       Future<LoadTask> task = mergerPool.submit(merger);
-      taskIn.add(task);
+      taskOut.add(task);
       localMerger.add(merger);
+    }
+  }
+
+  public void startLoad() {
+    Future<LoadTask> head = taskOut.peek();
+    if (head != null && head.isDone()) {
+      // get result of last load
+      if (loadResult != null && loadResult.isDone()) {
+        try {
+          loadResult.get();
+        } catch (ExecutionException e) {
+          pipeLine.state = PipeLineState.ERROR;
+          pipeLine.e = new BiremeException("Loader failed.\n", e.getCause());
+          return;
+        } catch (InterruptedException e) {
+          pipeLine.state = PipeLineState.ERROR;
+          pipeLine.e = new BiremeException("Get Future<Long> failed, be interrupted", e);
+          return;
+        }
+      }
+
+      // start a new load
+      if (loadResult == null || loadResult.isDone()) {
+        loadResult = cxt.loaderPool.submit(loader);
+      }
     }
   }
 

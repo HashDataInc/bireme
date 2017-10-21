@@ -19,18 +19,19 @@ import cn.hashdata.bireme.Context;
 import cn.hashdata.bireme.Row;
 import cn.hashdata.bireme.RowSet;
 
-public abstract class KafkaProvider extends Provider {
+public abstract class KafkaPipeLine extends PipeLine {
   protected KafkaConsumer<String, String> consumer;
   protected LinkedBlockingQueue<KafkaCommitCallback> commitCallbacks;
 
-  public KafkaProvider(Context cxt, SourceConfig conf) {
+  public KafkaPipeLine(Context cxt, SourceConfig conf) {
     super(cxt, conf);
-    consumer = KafkaProvider.createConsumer(conf.server, conf.groupID);
+    consumer = KafkaPipeLine.createConsumer(conf.server, conf.groupID);
     commitCallbacks = new LinkedBlockingQueue<KafkaCommitCallback>();
   }
 
   @Override
   public ChangeSet pollChangeSet() throws BiremeException {
+    // TODO can set parameter as 0L?
     ConsumerRecords<String, String> records = consumer.poll(1000L);
 
     if (cxt.stop || records.isEmpty()) {

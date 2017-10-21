@@ -16,6 +16,7 @@ import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.logging.log4j.LogManager;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -29,15 +30,14 @@ import cn.hashdata.bireme.Row;
 import cn.hashdata.bireme.Table;
 import cn.hashdata.bireme.Row.RowType;
 
-public class DebeziumProvider extends KafkaProvider {
-  public DebeziumProvider(Context cxt, SourceConfig conf, String topic) {
+public class DebeziumPipeLine extends KafkaPipeLine {
+  public DebeziumPipeLine(Context cxt, SourceConfig conf, String topic) {
     super(cxt, conf);
-    List<TopicPartition> topicPartition =
-        consumer.partitionsFor(topic)
-            .stream()
-            .map(p -> new TopicPartition(p.topic(), p.partition()))
-            .collect(Collectors.toList());
+    List<TopicPartition> topicPartition = consumer.partitionsFor(topic).stream()
+        .map(p -> new TopicPartition(p.topic(), p.partition())).collect(Collectors.toList());
     consumer.assign(topicPartition);
+
+    logger = LogManager.getLogger("Bireme." + DebeziumPipeLine.class + ": " + topic);
   }
 
   @Override
@@ -200,9 +200,9 @@ public class DebeziumProvider extends KafkaProvider {
           try {
             c.setTime(sdf.parse("1970-01-01"));
           } catch (ParseException e) {
-            /* TODO
-            logger.error("Can not decode Data/Time {}, message{}.", data, e.getMessage());
-            */
+            /*
+             * TODO logger.error("Can not decode Data/Time {}, message{}.", data, e.getMessage());
+             */
             return "";
           }
 

@@ -33,10 +33,10 @@ public class Config {
 
   private Configuration config;
 
+  public int pipeline_pool_size;
+
   public int transform_pool_size;
   public int transform_queue_size;
-
-  public int dispatch_pool_size;
 
   public int row_cache_size;
 
@@ -89,10 +89,10 @@ public class Config {
   }
 
   protected void basicConfig() {
+    pipeline_pool_size = config.getInt("pipeline.threadPool.size", 5);
+
     transform_pool_size = config.getInt("transform.threadPool.size", 10);
     transform_queue_size = config.getInt("transform.resultQueue.size", 10);
-
-    dispatch_pool_size = config.getInt("dispatch.threadPool.size", 10);
 
     merge_pool_size = config.getInt("merge.threadPool.size", 10);
     merge_interval = config.getInt("merge.interval", 10000);
@@ -267,13 +267,12 @@ public class Config {
    */
   public void logConfig() {
     String config = "Configures: " + "\n\ttransform thread pool size = " + transform_pool_size
-        + "\n\ttransform queue size = " + transform_queue_size + "\n\tdispatch thread pool size = "
-        + dispatch_pool_size + "\n\trow cache size = " + row_cache_size
-        + "\n\tmerge thread pool size = " + merge_pool_size + "\n\tmerge interval = "
-        + merge_interval + "\n\tbatch size = " + batch_size + "\n\tloader connection size = "
-        + loader_conn_size + "\n\tloader task queue size = " + loader_task_queue_size
-        + "\n\tloaders count = " + loadersCount + "\n\treporter = " + reporter
-        + "\n\treport interval = " + report_interval + "\n\tstate server addr = "
+        + "\n\ttransform queue size = " + transform_queue_size + "\n\trow cache size = "
+        + row_cache_size + "\n\tmerge thread pool size = " + merge_pool_size
+        + "\n\tmerge interval = " + merge_interval + "\n\tbatch size = " + batch_size
+        + "\n\tloader connection size = " + loader_conn_size + "\n\tloader task queue size = "
+        + loader_task_queue_size + "\n\tloaders count = " + loadersCount + "\n\treporter = "
+        + reporter + "\n\treport interval = " + report_interval + "\n\tstate server addr = "
         + state_server_addr + "\n\tstate server port = " + state_server_port
         + "\n\ttarget database url = " + targetDatabase.jdbcUrl;
 

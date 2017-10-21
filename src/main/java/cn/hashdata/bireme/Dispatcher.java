@@ -3,31 +3,31 @@ package cn.hashdata.bireme;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map.Entry;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import cn.hashdata.bireme.provider.Provider;
+import cn.hashdata.bireme.provider.PipeLine;
 
-public class Dispatcher implements Callable<Long> {
+public class Dispatcher {
   public Context cxt;
+  public PipeLine pipeLine;
   public RowSet rowSet;
   public boolean complete;
   public LinkedBlockingQueue<Future<RowSet>> transResult;
   public ConcurrentHashMap<String, RowCache> cache;
 
-  public Dispatcher(Context cxt, Provider pipeLine) {
+  public Dispatcher(Context cxt, PipeLine pipeLine) {
     this.cxt = cxt;
+    this.pipeLine = pipeLine;
     this.rowSet = null;
     this.complete = false;
     this.transResult = pipeLine.transResult;
     this.cache = pipeLine.cache;
   }
 
-  @Override
-  public Long call() throws BiremeException {
+  public Long start() throws BiremeException {
     if (rowSet != null) {
       complete = insertRowSet();
 
@@ -62,7 +62,7 @@ public class Dispatcher implements Callable<Long> {
     return 0L;
   }
 
-  private boolean insertRowSet() throws BiremeException {
+  private boolean insertRowSet() {
     HashMap<String, ArrayList<Row>> bucket = rowSet.rowBucket;
     boolean complete = true;
 
@@ -72,7 +72,7 @@ public class Dispatcher implements Callable<Long> {
       RowCache rowCache = cache.get(fullTableName);
 
       if (rowCache == null) {
-        rowCache = new RowCache(cxt, fullTableName);
+        rowCache = new RowCache(cxt, fullTableName, pipeLine);
         cache.put(fullTableName, rowCache);
       }
 

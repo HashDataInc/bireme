@@ -6,10 +6,11 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+
+import org.apache.logging.log4j.Logger;
 
 import cn.hashdata.bireme.BiremeException;
 import cn.hashdata.bireme.ChangeSet;
@@ -21,7 +22,16 @@ import cn.hashdata.bireme.RowCache;
 import cn.hashdata.bireme.RowSet;
 import cn.hashdata.bireme.Table;
 
-public abstract class Provider {
+public abstract class PipeLine implements Callable<PipeLine>{
+  public enum PipeLineState {
+    NORMAL, ERROR, STOP
+  }
+
+  public Logger logger;
+  
+  public volatile PipeLineState state;
+  public BiremeException e;
+
   public Context cxt;
   public SourceConfig conf;
 
@@ -29,22 +39,23 @@ public abstract class Provider {
   private LinkedList<Transformer> localTransformer;
 
   private Dispatcher dispatcher;
-  private Future<Long> dispatchReturn;
 
-  public ConcurrentHashMap<String, RowCache> cache; // TODO key target table
+  public ConcurrentHashMap<String, RowCache> cache;
 
-  public Provider(Context cxt, SourceConfig conf) {
+  public PipeLine(Context cxt, SourceConfig conf) {
+    this.state = PipeLineState.NORMAL;
+    this.e = null;
+
     this.cxt = cxt;
     this.conf = conf;
 
-    int queueSize = 10; // set in configuration
+    int queueSize = cxt.conf.transform_queue_size;
 
     transResult = new LinkedBlockingQueue<Future<RowSet>>(queueSize);
     localTransformer = new LinkedList<Transformer>();
 
     cache = new ConcurrentHashMap<String, RowCache>();
 
-    dispatchReturn = null;
     dispatcher = new Dispatcher(cxt, this);
 
     for (int i = 0; i < queueSize; i++) {
@@ -52,10 +63,18 @@ public abstract class Provider {
     }
   }
 
-  public void execute() throws BiremeException, InterruptedException {
-    // Poll data and start transformer
+  @Override
+  public PipeLine call() {
+    // Poll data and start transformer TODO add comment
     while (transResult.remainingCapacity() != 0) {
-      ChangeSet changeSet = pollChangeSet();
+      ChangeSet changeSet = null;
+      try {
+        changeSet = pollChangeSet();
+      } catch (BiremeException e) {
+        state = PipeLineState.ERROR;
+        this.e = e;
+        return this;
+      }
 
       if (changeSet == null) {
         break;
@@ -68,31 +87,31 @@ public abstract class Provider {
     }
 
     // Start dispatcher, only one dispatcher for each pipeline
-    if (!transResult.isEmpty()) {
-      if (dispatchReturn == null) {
-        startDispatch();
-
-      } else if (dispatchReturn.isDone()) {
-        try {
-          dispatchReturn.get();
-        } catch (ExecutionException e) {
-          throw new BiremeException("Dispatch failed.\n", e.getCause());
-        }
-
-        startDispatch();
-      }
+    try {
+      dispatcher.start();
+    } catch (BiremeException e) {
+      state = PipeLineState.ERROR;
+      this.e = new BiremeException("Dispatch failed.\n", e.getCause());
+      return this;
     }
 
     // Start merger
     for (RowCache rowCache : cache.values()) {
       if (rowCache.shouldMerge()) {
-        rowCache.startMerge();
+        try {
+          rowCache.startMerge();
+        } catch (BiremeException e) {
+          state = PipeLineState.ERROR;
+          this.e = e;
+          return this;
+        }
       }
+      rowCache.startLoad();
     }
 
     // Commit result
     checkAndCommit();
-    return;
+    return this;
   }
 
   public abstract ChangeSet pollChangeSet() throws BiremeException;
@@ -105,11 +124,6 @@ public abstract class Provider {
     ExecutorService transformerPool = cxt.transformerPool;
     Future<RowSet> result = transformerPool.submit(trans);
     transResult.add(result);
-  }
-
-  private void startDispatch() {
-    ExecutorService dispatcherPool = cxt.dispatcherPool;
-    dispatchReturn = dispatcherPool.submit(dispatcher);
   }
 
   /**
@@ -373,15 +387,6 @@ public abstract class Provider {
      * @throws BiremeException Exceptions when fill the {@code RowSet}
      */
     public abstract void fillRowSet(RowSet rowSet) throws BiremeException;
-
-    /**
-     * Get the outer {@code Provider} of this {@code Transformer}.
-     *
-     * @return the outer {@code Provider}
-     */
-    /*
-     * TODO public Provider getProvider() { return Provider.this; }
-     */
 
     /**
      * After convert a single change data to a {@code Row}, insert into the {@code RowSet}.
