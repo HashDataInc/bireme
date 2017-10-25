@@ -5,7 +5,7 @@
       <PatternLayout pattern="%d{HH:mm:ss,SSS} %-5level %logger{1} - %msg%n"/>
     </Console>
     <Console name="BiremeConsole" target="SYSTEM_OUT">
-      <PatternLayout pattern="%d{HH:mm:ss} %-5level %logger{1} - %msg%n"/>"
+      <PatternLayout pattern="%d{HH:mm:ss} %-5level %logger{-1} - %msg%n"/>"
     </Console>
   </Appenders>
   <Loggers>
