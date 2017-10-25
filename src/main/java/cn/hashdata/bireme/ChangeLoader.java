@@ -11,7 +11,6 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -24,14 +23,13 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
 
-import com.codahale.metrics.Gauge;
-import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
+
+import cn.hashdata.bireme.provider.PipeLine;
 
 /**
  * {@code ChangeLoader} poll tasks and load the tasks to database. Each {@code ChangeLoader}
@@ -55,8 +53,7 @@ public class ChangeLoader implements Callable<Long> {
   protected LoadTask currentTask;
   protected ExecutorService copyThread;
 
-  private LoadState state;
-  private String mappedTable;
+  public String mappedTable;
 
   private Timer copyForDeleteTimer;
   private Timer deleteTimer;
@@ -69,37 +66,28 @@ public class ChangeLoader implements Callable<Long> {
    * @param cxt bireme context
    * @param mappedTable the corresponding table
    */
-  public ChangeLoader(Context cxt, String mappedTable,
+  public ChangeLoader(Context cxt, PipeLine pipeLine, String mappedTable,
       LinkedBlockingQueue<Future<LoadTask>> taskIn) {
     this.cxt = cxt;
     this.conf = cxt.conf;
     this.conn = null;
-    this.state = null;
     this.mappedTable = mappedTable;
     this.table = cxt.tablesInfo.get(mappedTable);
     this.taskIn = taskIn;
     this.copyThread = Executors.newFixedThreadPool(1);
 
-    this.logger = LogManager.getLogger("Bireme." + ChangeLoader.class);
+    // add statistics
+    Timer[] timers = pipeLine.stat.addTimerForLoader(mappedTable);
+    copyForDeleteTimer = timers[0];
+    deleteTimer = timers[1];
+    copyForInsertTimer = timers[2];
     
-    cxt.metrics.register(MetricRegistry.name(Context.class, "TaskQueue for " + mappedTable),
-        new Gauge<Integer>() {
-          @Override
-          public Integer getValue() {
-            return taskIn.size();
-          }
-        });
-
-    copyForDeleteTimer =
-        cxt.metrics.timer(MetricRegistry.name(ChangeLoader.class, mappedTable, "CopyForDelete"));
-    deleteTimer = cxt.metrics.timer(MetricRegistry.name(ChangeLoader.class, mappedTable, "Delete"));
-    copyForInsertTimer =
-        cxt.metrics.timer(MetricRegistry.name(ChangeLoader.class, mappedTable, "CopyForInsert"));
+    logger = pipeLine.logger;
   }
 
   /**
    * Get the task and copy it to target database
-   * 
+   *
    * @throws BiremeException load exception
    * @throws InterruptedException interrupted when load the task
    * @return if normally end, return 0
@@ -126,9 +114,11 @@ public class ChangeLoader implements Callable<Long> {
       try {
         executeTask();
       } catch (InterruptedException | BiremeException e) {
+        // add log
         try {
           conn.rollback();
         } catch (Exception ignore) {
+          // TODO add log
         }
         throw e;
       } finally {
@@ -139,14 +129,6 @@ public class ChangeLoader implements Callable<Long> {
       }
     }
     return 0L;
-  }
-
-  public synchronized LoadState getLoadState() {
-    return this.state;
-  }
-
-  private synchronized void setLoadState(LoadState state) {
-    this.state = state;
   }
 
   /**
@@ -251,9 +233,6 @@ public class ChangeLoader implements Callable<Long> {
       }
     }
 
-    currentTask.loadState.setCompleteTime(new Date().getTime());
-    setLoadState(currentTask.loadState);
-
     for (CommitCallback callback : currentTask.callbacks) {
       callback.done();
     }
@@ -347,9 +326,13 @@ public class ChangeLoader implements Callable<Long> {
   }
 
   private String getCopySql(String tableName, List<String> columnList) {
-    StringBuilder sb = new StringBuilder().append("COPY ").append(tableName).append(" (")
-        .append(StringUtils.join(columnList, ","))
-        .append(") FROM STDIN WITH DELIMITER '|' NULL '' CSV QUOTE '\"' ESCAPE E'\\\\';");
+    StringBuilder sb =
+        new StringBuilder()
+            .append("COPY ")
+            .append(tableName)
+            .append(" (")
+            .append(StringUtils.join(columnList, ","))
+            .append(") FROM STDIN WITH DELIMITER '|' NULL '' CSV QUOTE '\"' ESCAPE E'\\\\';");
     String sql = sb.toString();
     return sql;
   }

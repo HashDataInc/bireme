@@ -5,7 +5,6 @@
 package cn.hashdata.bireme;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 
@@ -56,7 +55,7 @@ public class Config {
 
   public ConnectionConfig targetDatabase;
 
-  public ArrayList<SourceConfig> sourceConfig;
+  public HashMap<String, SourceConfig> sourceConfig;
   public HashMap<String, String> tableMap;
 
   public static class ConnectionConfig {
@@ -108,7 +107,7 @@ public class Config {
     state_server_addr = config.getString("state.server.addr", "0.0.0.0");
     state_server_port = config.getInt("state.server.port", 8080);
 
-    sourceConfig = new ArrayList<SourceConfig>();
+    sourceConfig = new HashMap<String, SourceConfig>();
     tableMap = new HashMap<String, String>();
   }
 
@@ -141,7 +140,7 @@ public class Config {
       throw new BiremeException(message);
     }
     for (int i = 0; i < sources.length; i++) {
-      sourceConfig.add(new SourceConfig(sources[i]));
+      sourceConfig.put(sources[i], new SourceConfig(sources[i]));
     }
 
     fetchSourceAndTableMap();
@@ -156,7 +155,7 @@ public class Config {
   protected void fetchSourceAndTableMap() throws BiremeException, ConfigurationException {
     loadersCount = 0;
 
-    for (SourceConfig conf : sourceConfig) {
+    for (SourceConfig conf : sourceConfig.values()) {
       String type = config.getString(conf.name + ".type");
 
       switch (type) {
@@ -266,21 +265,22 @@ public class Config {
    * Print log about bireme configuration.
    */
   public void logConfig() {
-    String config = "Configures: " + "\n\ttransform thread pool size = " + transform_pool_size
-        + "\n\ttransform queue size = " + transform_queue_size + "\n\trow cache size = "
-        + row_cache_size + "\n\tmerge thread pool size = " + merge_pool_size
+    String config = "Configures: "
+        + "\n\ttransform thread pool size = " + transform_pool_size + "\n\ttransform queue size = "
+        + transform_queue_size + "\n\trow cache size = " + row_cache_size
+        + "\n\tmerge thread pool size = " + merge_pool_size
         + "\n\tmerge interval = " + merge_interval + "\n\tbatch size = " + batch_size
         + "\n\tloader connection size = " + loader_conn_size + "\n\tloader task queue size = "
-        + loader_task_queue_size + "\n\tloaders count = " + loadersCount + "\n\treporter = "
-        + reporter + "\n\treport interval = " + report_interval + "\n\tstate server addr = "
-        + state_server_addr + "\n\tstate server port = " + state_server_port
-        + "\n\ttarget database url = " + targetDatabase.jdbcUrl;
+        + loader_task_queue_size + "\n\tloaders count = " + loadersCount
+        + "\n\treporter = " + reporter + "\n\treport interval = " + report_interval
+        + "\n\tstate server addr = " + state_server_addr + "\n\tstate server port = "
+        + state_server_port + "\n\ttarget database url = " + targetDatabase.jdbcUrl;
 
     logger.info(config);
 
     StringBuilder sb = new StringBuilder();
     sb.append("Data Source: \n");
-    for (SourceConfig conf : sourceConfig) {
+    for (SourceConfig conf : sourceConfig.values()) {
       sb.append("\tType: " + conf.type.name() + " Name: " + conf.name + "\n");
     }
 

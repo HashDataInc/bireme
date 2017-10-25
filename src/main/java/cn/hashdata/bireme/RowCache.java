@@ -14,7 +14,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import cn.hashdata.bireme.provider.PipeLine;
-import cn.hashdata.bireme.provider.PipeLine.PipeLineState;
 
 /**
  * An in-memory cache for {@code Row}. We use cache to merge and load operations in batch.
@@ -27,6 +26,7 @@ public class RowCache {
   static final protected Long TIMEOUT_MS = 1000L;
 
   public Context cxt;
+  public String tableName;
   public PipeLine pipeLine;
 
   private Long lastMergeTime;
@@ -37,7 +37,7 @@ public class RowCache {
   private LinkedBlockingQueue<CommitCallback> commitCallback;
 
   private LinkedList<RowBatchMerger> localMerger;
-  public LinkedBlockingQueue<Future<LoadTask>> taskOut;
+  public LinkedBlockingQueue<Future<LoadTask>> mergeResult;
   public ChangeLoader loader;
   public Future<Long> loadResult;
 
@@ -49,6 +49,7 @@ public class RowCache {
    */
   public RowCache(Context cxt, String tableName, PipeLine pipeLine) {
     this.cxt = cxt;
+    this.tableName = tableName;
     this.pipeLine = pipeLine;
 
     this.lastMergeTime = new Date().getTime();
@@ -63,8 +64,11 @@ public class RowCache {
       localMerger.add(new RowBatchMerger());
     }
 
-    this.taskOut = new LinkedBlockingQueue<Future<LoadTask>>(cxt.conf.loader_task_queue_size);
-    this.loader = new ChangeLoader(cxt, tableName, taskOut);
+    this.mergeResult = new LinkedBlockingQueue<Future<LoadTask>>(cxt.conf.loader_task_queue_size);
+    this.loader = new ChangeLoader(cxt, pipeLine, tableName, mergeResult);
+
+    // add statistics
+    pipeLine.stat.addGaugeForCache(tableName, this);
   }
 
   /**
@@ -76,14 +80,12 @@ public class RowCache {
    * @throws BiremeException when cache has enough but cannot add to cache
    */
   public boolean addRows(ArrayList<Row> newRows, CommitCallback callback) {
-    synchronized (rows) {
-      if (rows.remainingCapacity() < newRows.size()) {
-        return false;
-      }
-
-      rows.addAll(newRows);
-      commitCallback.offer(callback);
+    if (rows.remainingCapacity() < newRows.size()) {
+      return false;
     }
+
+    rows.addAll(newRows);
+    commitCallback.offer(callback);
 
     return true;
   }
@@ -96,52 +98,39 @@ public class RowCache {
   }
 
   public void startMerge() throws BiremeException {
-    synchronized (taskOut) {
-      if (taskOut.remainingCapacity() == 0 || rows.isEmpty()) {
-        return;
-      }
-
-      ArrayList<CommitCallback> callbacks = new ArrayList<CommitCallback>();
-      ArrayList<Row> batch = null;
-
-      try {
-        batch = cxt.idleRowArrays.borrowObject();
-      } catch (Exception e) {
-        String message = "Can't not borrow RowArrays from the Object Pool.\n";
-        throw new BiremeException(message, e);
-      }
-
-      synchronized (rows) {
-        rows.drainTo(batch);
-        commitCallback.drainTo(callbacks);
-      }
-
-      RowBatchMerger merger = localMerger.remove();
-      merger.setBatch(batch, callbacks);
-
-      ExecutorService mergerPool = cxt.mergerPool;
-      Future<LoadTask> task = mergerPool.submit(merger);
-      taskOut.add(task);
-      localMerger.add(merger);
+    if (mergeResult.remainingCapacity() == 0 || rows.isEmpty()) {
+      return;
     }
+
+    ArrayList<CommitCallback> callbacks = new ArrayList<CommitCallback>();
+    ArrayList<Row> batch = null;
+
+    try {
+      batch = cxt.idleRowArrays.borrowObject();
+    } catch (Exception e) {
+      String message = "Can't not borrow RowArrays from the Object Pool.\n";
+      throw new BiremeException(message, e);
+    }
+
+    rows.drainTo(batch);
+    commitCallback.drainTo(callbacks);
+
+    RowBatchMerger merger = localMerger.remove();
+    merger.setBatch(batch, callbacks);
+
+    ExecutorService mergerPool = cxt.mergerPool;
+    Future<LoadTask> task = mergerPool.submit(merger);
+    mergeResult.add(task);
+    localMerger.add(merger);
   }
 
-  public void startLoad() {
-    Future<LoadTask> head = taskOut.peek();
+  public void startLoad() throws InterruptedException, ExecutionException {
+    Future<LoadTask> head = mergeResult.peek();
+
     if (head != null && head.isDone()) {
       // get result of last load
       if (loadResult != null && loadResult.isDone()) {
-        try {
-          loadResult.get();
-        } catch (ExecutionException e) {
-          pipeLine.state = PipeLineState.ERROR;
-          pipeLine.e = new BiremeException("Loader failed.\n", e.getCause());
-          return;
-        } catch (InterruptedException e) {
-          pipeLine.state = PipeLineState.ERROR;
-          pipeLine.e = new BiremeException("Get Future<Long> failed, be interrupted", e);
-          return;
-        }
+        loadResult.get();
       }
 
       // start a new load
@@ -158,7 +147,7 @@ public class RowCache {
    * @author yuze
    *
    */
-  public class RowBatchMerger implements Callable<LoadTask> {
+  class RowBatchMerger implements Callable<LoadTask> {
     protected ArrayList<Row> rows;
     protected ArrayList<CommitCallback> callbacks;
 
@@ -182,12 +171,8 @@ public class RowCache {
      */
     public LoadTask call() {
       LoadTask task = new LoadTask();
-      LoadState state = task.loadState;
 
       for (Row row : rows) {
-        state.setProduceTime(row.originTable, row.produceTime);
-        state.setReceiveTime(row.originTable, row.receiveTime);
-
         switch (row.type) {
           case INSERT:
             task.insert.put(row.keys, row.tuple);

@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -16,21 +17,22 @@ import cn.hashdata.bireme.BiremeException;
 import cn.hashdata.bireme.ChangeSet;
 import cn.hashdata.bireme.Context;
 import cn.hashdata.bireme.Dispatcher;
+import cn.hashdata.bireme.PipeLineStat;
 import cn.hashdata.bireme.Record;
 import cn.hashdata.bireme.Row;
 import cn.hashdata.bireme.RowCache;
 import cn.hashdata.bireme.RowSet;
 import cn.hashdata.bireme.Table;
 
-public abstract class PipeLine implements Callable<PipeLine>{
-  public enum PipeLineState {
-    NORMAL, ERROR, STOP
-  }
+public abstract class PipeLine implements Callable<PipeLine> {
+  public enum PipeLineState { NORMAL, ERROR, STOP }
 
   public Logger logger;
-  
+
+  public String myName;
   public volatile PipeLineState state;
   public BiremeException e;
+  public PipeLineStat stat;
 
   public Context cxt;
   public SourceConfig conf;
@@ -42,7 +44,8 @@ public abstract class PipeLine implements Callable<PipeLine>{
 
   public ConcurrentHashMap<String, RowCache> cache;
 
-  public PipeLine(Context cxt, SourceConfig conf) {
+  public PipeLine(Context cxt, SourceConfig conf, String myName) {
+    this.myName = myName;
     this.state = PipeLineState.NORMAL;
     this.e = null;
 
@@ -61,18 +64,26 @@ public abstract class PipeLine implements Callable<PipeLine>{
     for (int i = 0; i < queueSize; i++) {
       localTransformer.add(createTransformer());
     }
+
+    // initialize statistics
+    this.stat = new PipeLineStat(this);
   }
 
   @Override
   public PipeLine call() {
-    // Poll data and start transformer TODO add comment
+    // Poll data and start transformer
     while (transResult.remainingCapacity() != 0) {
       ChangeSet changeSet = null;
+
       try {
         changeSet = pollChangeSet();
       } catch (BiremeException e) {
         state = PipeLineState.ERROR;
         this.e = e;
+
+        logger.error("Poll change set failed. Message: {}", e.getMessage());
+        logger.error("Stack Trace: ", e);
+
         return this;
       }
 
@@ -88,10 +99,14 @@ public abstract class PipeLine implements Callable<PipeLine>{
 
     // Start dispatcher, only one dispatcher for each pipeline
     try {
-      dispatcher.start();
+      dispatcher.dispatch();
     } catch (BiremeException e) {
       state = PipeLineState.ERROR;
-      this.e = new BiremeException("Dispatch failed.\n", e.getCause());
+      this.e = e;
+
+      logger.error("Dispatch failed. Message: {}", e.getMessage());
+      logger.error("Stack Trace: ", e);
+
       return this;
     }
 
@@ -103,10 +118,33 @@ public abstract class PipeLine implements Callable<PipeLine>{
         } catch (BiremeException e) {
           state = PipeLineState.ERROR;
           this.e = e;
+
+          logger.error("Start merge failed. Message: {}", e.getMessage());
+          logger.error("Stack Trace: ", e);
+
           return this;
         }
       }
-      rowCache.startLoad();
+      try {
+        rowCache.startLoad();
+      } catch (ExecutionException e) {
+        state = PipeLineState.ERROR;
+        this.e = new BiremeException("Loader failed.", e.getCause());
+
+        logger.info("Loader for {} failed. Message: {}.", rowCache.tableName, e.getMessage());
+        logger.info("Stack Trace: ", e);
+
+        return this;
+      } catch (InterruptedException e) {
+        state = PipeLineState.ERROR;
+        this.e = new BiremeException("Get Future<Long> failed, be interrupted", e);
+
+        logger.info("Interrupted when getting loader result for {}. Message: {}.",
+            rowCache.tableName, e.getMessage());
+        logger.info("Stack Trace: ", e);
+
+        return this;
+      }
     }
 
     // Commit result
@@ -327,7 +365,7 @@ public abstract class PipeLine implements Callable<PipeLine>{
 
         switch (c) {
           case 0x00:
-            // TODO logger.warn("illegal character 0x00, deleted.");
+            logger.warn("illegal character 0x00, deleted.");
             continue;
           case QUOTE:
           case ESCAPE:

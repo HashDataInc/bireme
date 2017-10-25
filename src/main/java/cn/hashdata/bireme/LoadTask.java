@@ -17,7 +17,6 @@ import java.util.HashSet;
  */
 public class LoadTask {
   public ArrayList<CommitCallback> callbacks;
-  public LoadState loadState;
   public HashSet<String> delete;
   public HashMap<String, String> insert;
 
@@ -28,7 +27,6 @@ public class LoadTask {
    */
   public LoadTask() {
     this.callbacks = new ArrayList<CommitCallback>();
-    this.loadState = new LoadState();
     this.delete = new HashSet<String>();
     this.insert = new HashMap<String, String>();
   }

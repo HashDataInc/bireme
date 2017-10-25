@@ -11,6 +11,8 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 
+import com.codahale.metrics.Timer;
+
 import cn.hashdata.bireme.AbstractCommitCallback;
 import cn.hashdata.bireme.BiremeException;
 import cn.hashdata.bireme.ChangeSet;
@@ -23,8 +25,8 @@ public abstract class KafkaPipeLine extends PipeLine {
   protected KafkaConsumer<String, String> consumer;
   protected LinkedBlockingQueue<KafkaCommitCallback> commitCallbacks;
 
-  public KafkaPipeLine(Context cxt, SourceConfig conf) {
-    super(cxt, conf);
+  public KafkaPipeLine(Context cxt, SourceConfig conf, String myName) {
+    super(cxt, conf, myName);
     consumer = KafkaPipeLine.createConsumer(conf.server, conf.groupID);
     commitCallbacks = new LinkedBlockingQueue<KafkaCommitCallback>();
   }
@@ -44,6 +46,8 @@ public abstract class KafkaPipeLine extends PipeLine {
       String Message = "Can't add CommitCallback to queue.";
       throw new BiremeException(Message);
     }
+
+    stat.recordCount.mark(records.count());
 
     return packRecords(records, callback);
   }
@@ -93,7 +97,7 @@ public abstract class KafkaPipeLine extends PipeLine {
     @Override
     public void fillRowSet(RowSet rowSet) throws BiremeException {
       CommitCallback callback = changeSet.callback;
-      HashMap<TopicPartition, Long> offsets = ((KafkaCommitCallback) callback).partitionOffset;
+      HashMap<String, Long> offsets = ((KafkaCommitCallback) callback).partitionOffset;
       Row row = null;
 
       for (ConsumerRecord<String, String> change :
@@ -110,9 +114,9 @@ public abstract class KafkaPipeLine extends PipeLine {
           continue;
         }
 
-        row.receiveTime = changeSet.createdAt.getTime();
         addToRowSet(row, rowSet);
-        offsets.put(new TopicPartition(change.topic(), change.partition()), change.offset());
+        offsets.put(change.topic() + "+" + change.partition(), change.offset());
+        callback.setNewestRecord(row.produceTime);
       }
 
       callback.setNumOfTables(rowSet.rowBucket.size());
@@ -133,42 +137,42 @@ public abstract class KafkaPipeLine extends PipeLine {
   }
 
   public class KafkaCommitCallback extends AbstractCommitCallback {
-    public HashMap<TopicPartition, Long> partitionOffset;
+    public HashMap<String, Long> partitionOffset;
+    private Timer.Context timerCTX;
 
     public KafkaCommitCallback() {
-      this.partitionOffset = new HashMap<TopicPartition, Long>();
-    }
+      this.partitionOffset = new HashMap<String, Long>();
 
-    @Override
-    public String getType() {
-      return null;
+      // record the time being created
+      timerCTX = stat.avgDelay.time();
     }
-
-    @Override
-    public String toStirng() {
-      return null;
-    }
-
-    @Override
-    public void fromString(String str) {}
 
     @Override
     public void commit() {
       HashMap<TopicPartition, OffsetAndMetadata> offsets =
           new HashMap<TopicPartition, OffsetAndMetadata>();
-      partitionOffset.forEach(
-          (key, value) -> { offsets.put(key, new OffsetAndMetadata(value + 1)); });
+      partitionOffset.forEach((key, value) -> {
+        String topic = key.split("\\+")[0];
+        int partition = Integer.valueOf(key.split("\\+")[1]);
+
+        offsets.put(new TopicPartition(topic, partition), new OffsetAndMetadata(value + 1));
+      });
 
       consumer.commitSync(offsets);
       committed.set(true);
       partitionOffset.clear();
+
+      // record the time being committed
+      timerCTX.stop();
+      // Update the
+      stat.newestCompleted = newestRecord;
     }
   }
 
   public static KafkaConsumer<String, String> createConsumer(String server, String groupID) {
     Properties props = new Properties();
     props.put("bootstrap.servers", server);
-    props.put("group.id", "bireme1");
+    props.put("group.id", groupID);
     props.put("enable.auto.commit", false);
     props.put("session.timeout.ms", 30000);
     props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");

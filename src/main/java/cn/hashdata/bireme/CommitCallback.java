@@ -12,28 +12,6 @@ package cn.hashdata.bireme;
  */
 public interface CommitCallback {
   /**
-   * Get the type of this {@code Position}. Usually, each type of data source has a specific method
-   * to represent the position.
-   *
-   * @return the type of this {@code Position}.
-   */
-  public String getType();
-
-  /**
-   * Serialize this {@code Position} in order to store it in the database.
-   *
-   * @return the serialized {@code Position}.
-   */
-  public String toStirng();
-
-  /**
-   * Restore this {@code Position} according the serialized {@code Position}.
-   *
-   * @param str the serialized {@code Position}.
-   */
-  public void fromString(String str);
-
-  /**
    * Set the number of corresponding tables
    *
    * @param tables number of tables
@@ -57,4 +35,9 @@ public interface CommitCallback {
    * Commit this callback.
    */
   public void commit();
+
+  /**
+   * Set the produce time of the newest record in corresponding set
+   */
+  public void setNewestRecord(Long time);
 }

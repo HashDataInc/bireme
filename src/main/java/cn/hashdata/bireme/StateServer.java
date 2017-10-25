@@ -5,6 +5,8 @@ import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Date;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -18,7 +20,8 @@ import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-import cn.hashdata.bireme.LoadState.PlainState;
+import cn.hashdata.bireme.provider.PipeLine;
+import cn.hashdata.bireme.provider.SourceConfig;
 
 import org.eclipse.jetty.server.Request;
 
@@ -60,9 +63,9 @@ public class StateServer {
     context.setHandler(new StateHandler());
     contexts.addHandler(context);
 
-    for (String table : cxt.changeLoaders.keySet()) {
-      context = new ContextHandler("/" + table);
-      context.setHandler(new StateHandler(table));
+    for (SourceConfig conf : cxt.conf.sourceConfig.values()) {
+      context = new ContextHandler("/" + conf.name);
+      context.setHandler(new StateHandler(conf));
       contexts.addHandler(context);
     }
 
@@ -91,13 +94,13 @@ public class StateServer {
    *
    */
   class StateHandler extends AbstractHandler {
-    final String table;
+    final SourceConfig source;
 
     /**
      * Create a new StateHandler
      */
     public StateHandler() {
-      this.table = null;
+      this.source = null;
     }
 
     /**
@@ -105,8 +108,8 @@ public class StateServer {
      *
      * @param table set the target table for this handler
      */
-    public StateHandler(String table) {
-      this.table = table;
+    public StateHandler(SourceConfig conf) {
+      this.source = conf;
     }
 
     @Override
@@ -141,26 +144,56 @@ public class StateServer {
         gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").create();
       }
 
-      if (table == null) {
+      if (source == null) {
         StringBuilder sb = new StringBuilder();
 
-        for (String targetTable : cxt.changeLoaders.keySet()) {
-          sb.append(gson.toJson(getTableState(targetTable), PlainState.class));
+        for (SourceConfig conf : cxt.conf.sourceConfig.values()) {
+          sb.append(gson.toJson(getSourceState(conf.name), Source.class));
         }
 
         result = sb.toString();
       } else {
-        result = gson.toJson(getTableState(table), PlainState.class);
+        result = gson.toJson(getSourceState(source.name), Source.class);
       }
 
       return result;
     }
 
-    private PlainState getTableState(String table) {
-      ChangeLoader loader = cxt.changeLoaders.get(table);
-      LoadState state = loader.getLoadState();
+    private Source getSourceState(String sourceName) {
+      SourceConfig conf = cxt.conf.sourceConfig.get(sourceName);
+      Source e = new Source(conf.name);
 
-      return state.getPlainState(table);
+      for (PipeLine p : conf.pipeLines) {
+        String name = p.myName;
+        PipeLineStat stat = p.stat;
+        Date newest_record = new Date(stat.newestCompleted);
+        double average_delay = stat.avgDelay.getMeanRate();
+
+        e.pipelines.add(new Stat(name, newest_record, average_delay));
+      }
+
+      return e;
+    }
+  }
+
+  class Stat {
+    String name;
+    Date newest_record;
+    double average_delay;
+
+    public Stat(String name, Date newest_record, double average_delay) {
+      this.name = name;
+      this.newest_record = newest_record;
+      this.average_delay = average_delay;
+    }
+  }
+  class Source {
+    String source_name;
+    ArrayList<Stat> pipelines;
+
+    public Source(String source_name) {
+      this.source_name = source_name;
+      pipelines = new ArrayList<Stat>();
     }
   }
 }

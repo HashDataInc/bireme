@@ -32,12 +32,20 @@ import cn.hashdata.bireme.Row.RowType;
 
 public class DebeziumPipeLine extends KafkaPipeLine {
   public DebeziumPipeLine(Context cxt, SourceConfig conf, String topic) {
-    super(cxt, conf);
-    List<TopicPartition> topicPartition = consumer.partitionsFor(topic).stream()
-        .map(p -> new TopicPartition(p.topic(), p.partition())).collect(Collectors.toList());
+    super(cxt, conf, "Debezium-" + conf.name + "-" + topic);
+    List<TopicPartition> topicPartition =
+        consumer.partitionsFor(topic)
+            .stream()
+            .map(p -> new TopicPartition(p.topic(), p.partition()))
+            .collect(Collectors.toList());
     consumer.assign(topicPartition);
 
-    logger = LogManager.getLogger("Bireme." + DebeziumPipeLine.class + ": " + topic);
+    logger = LogManager.getLogger("Bireme." + myName);
+    logger.info("Create new Debezium PipeLine. Name: {}", myName);
+
+    if (topicPartition.size() > 1) {
+      logger.warn("Topic {} has {} partitions", topic, topicPartition.size());
+    }
   }
 
   @Override
@@ -45,46 +53,7 @@ public class DebeziumPipeLine extends KafkaPipeLine {
     return new DebeziumTransformer();
   }
 
-  public class DebeziumTransformer extends KafkaTransformer {
-    public class DebeziumRecord implements Record {
-      public String topic;
-      public Long produceTime;
-      public RowType type;
-      public JsonObject data;
-
-      public DebeziumRecord(String topic, JsonObject payLoad) {
-        this.topic = topic;
-        char op = payLoad.get("op").getAsCharacter();
-        this.produceTime = payLoad.get("ts_ms").getAsLong();
-
-        JsonElement element = null;
-        switch (op) {
-          case 'r':
-          case 'c':
-            type = RowType.INSERT;
-            element = payLoad.get("after");
-            break;
-
-          case 'u':
-            type = RowType.UPDATE;
-            element = payLoad.get("after");
-            break;
-
-          case 'd':
-            type = RowType.DELETE;
-            element = payLoad.get("before");
-            break;
-        }
-
-        this.data = element.getAsJsonObject();
-      }
-
-      @Override
-      public String getField(String fieldName, boolean oldValue) throws BiremeException {
-        return BiremeUtility.jsonGetIgnoreCase(data, fieldName);
-      }
-    }
-
+  class DebeziumTransformer extends KafkaTransformer {
     public DebeziumTransformer() {
       super();
     }
@@ -200,9 +169,7 @@ public class DebeziumPipeLine extends KafkaPipeLine {
           try {
             c.setTime(sdf.parse("1970-01-01"));
           } catch (ParseException e) {
-            /*
-             * TODO logger.error("Can not decode Data/Time {}, message{}.", data, e.getMessage());
-             */
+            logger.error("Can not decode Data/Time {}, message{}.", data, e.getMessage());
             return "";
           }
 
@@ -225,6 +192,45 @@ public class DebeziumPipeLine extends KafkaPipeLine {
       BigDecimal bigDecimal = new BigDecimal(new BigInteger(value), precision);
 
       return bigDecimal.toString();
+    }
+
+    class DebeziumRecord implements Record {
+      public String topic;
+      public Long produceTime;
+      public RowType type;
+      public JsonObject data;
+
+      public DebeziumRecord(String topic, JsonObject payLoad) {
+        this.topic = topic;
+        char op = payLoad.get("op").getAsCharacter();
+        this.produceTime = payLoad.get("ts_ms").getAsLong();
+
+        JsonElement element = null;
+        switch (op) {
+          case 'r':
+          case 'c':
+            type = RowType.INSERT;
+            element = payLoad.get("after");
+            break;
+
+          case 'u':
+            type = RowType.UPDATE;
+            element = payLoad.get("after");
+            break;
+
+          case 'd':
+            type = RowType.DELETE;
+            element = payLoad.get("before");
+            break;
+        }
+
+        this.data = element.getAsJsonObject();
+      }
+
+      @Override
+      public String getField(String fieldName, boolean oldValue) throws BiremeException {
+        return BiremeUtility.jsonGetIgnoreCase(data, fieldName);
+      }
     }
   }
 }

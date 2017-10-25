@@ -41,7 +41,7 @@ public class Context {
   public volatile boolean stop = false;
 
   public Config conf;
-  public MetricRegistry metrics = new MetricRegistry();
+  public MetricRegistry register = new MetricRegistry();
 
   public HashMap<String, String> tableMap;
   public HashMap<String, Table> tablesInfo;
@@ -65,8 +65,7 @@ public class Context {
 
   public WatchDog watchDog;
 
-  // public StateServer server;
-
+  public StateServer server;
 
   /**
    * Create a new bireme context for test.
@@ -86,11 +85,10 @@ public class Context {
     this.pipeLines = new ArrayList<PipeLine>();
     this.schedule = Executors.newSingleThreadExecutor(new BiremeThreadFactory("Scheduler"));
 
-    // this.server = new StateServer(this, conf.state_server_addr, conf.state_server_port);
+    this.server = new StateServer(this, conf.state_server_addr, conf.state_server_port);
 
     createObjectPool();
     createThreadPool();
-    registerGauge();
   }
 
   private void createObjectPool() {
@@ -120,10 +118,6 @@ public class Context {
         Executors.newFixedThreadPool(conf.merge_pool_size, new BiremeThreadFactory("Merger"));
     loaderPool =
         Executors.newFixedThreadPool(conf.loader_conn_size, new BiremeThreadFactory("Loader"));
-  }
-
-  private void registerGauge() {
-    // TODO
   }
 
   static class WatchDog extends Thread {
@@ -156,7 +150,7 @@ public class Context {
 
   public void startScheduler() {
     scheduleResult = schedule.submit(new Scheduler(this));
-    // server.start();
+    server.start();
   }
 
   /**
@@ -167,7 +161,6 @@ public class Context {
    * @throws BiremeException Schedule Exception
    */
   public void waitForStop() throws InterruptedException, BiremeException {
-
     try {
       while (!scheduleResult.isDone()) {
         Thread.sleep(1);
@@ -176,6 +169,7 @@ public class Context {
     } catch (ExecutionException e) {
       throw new BiremeException("Schedule Exception.", e.getCause());
     } finally {
+      server.stop();
       schedule.shutdownNow();
       pipeLinePool.shutdownNow();
       transformerPool.shutdownNow();
@@ -183,7 +177,7 @@ public class Context {
       loaderPool.shutdownNow();
     }
   }
-  
+
   public void waitForExit() {
     try {
       schedule.awaitTermination(1, TimeUnit.MINUTES);
@@ -193,7 +187,6 @@ public class Context {
       loaderPool.awaitTermination(1, TimeUnit.MINUTES);
     } catch (InterruptedException ignore) {
     }
-    
   }
 }
 

@@ -8,10 +8,15 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.Future;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import cn.hashdata.bireme.provider.PipeLine;
 import cn.hashdata.bireme.provider.PipeLine.PipeLineState;
 
 public class Scheduler implements Callable<Long> {
+  public Logger logger = LogManager.getLogger("Bireme.Scheduler");
+
   public Context cxt;
   public CompletionService<PipeLine> cs;
   public LinkedList<PipeLine> pipeLineQueue;
@@ -31,6 +36,8 @@ public class Scheduler implements Callable<Long> {
 
   @Override
   public Long call() throws BiremeException {
+    logger.info("Scheduler start working.");
+
     PipeLine pipeLine = null;
 
     while (!cxt.stop) {
@@ -43,7 +50,6 @@ public class Scheduler implements Callable<Long> {
             workingPipeLine++;
             break;
           case ERROR:
-            // TODO print error message and stack
             pipeLine.state = PipeLineState.STOP;
             break;
           case STOP:
@@ -60,18 +66,20 @@ public class Scheduler implements Callable<Long> {
           if (result == null) {
             break;
           }
-          
+
           try {
             complete = result.get();
           } catch (ExecutionException | InterruptedException e) {
+            logger.warn("Pipeline throw out exception. Message {}", e.getMessage());
+
             throw new BiremeException("PipeLine shouldn't throw out exception.", e);
           }
-          
+
           pipeLineQueue.add(complete);
           workingPipeLine--;
         }
       } else {
-        // TODO print log, all pipeline stop
+        logger.info("All pipeline stop.");
         break;
       }
     }

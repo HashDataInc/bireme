@@ -37,6 +37,7 @@ import com.codahale.metrics.JmxReporter;
 import cn.hashdata.bireme.provider.DebeziumPipeLine;
 import cn.hashdata.bireme.provider.KafkaPipeLine;
 import cn.hashdata.bireme.provider.MaxwellPipeLine;
+import cn.hashdata.bireme.provider.PipeLine;
 import cn.hashdata.bireme.provider.SourceConfig;
 
 /**
@@ -52,7 +53,7 @@ public class Bireme implements Daemon {
   private DaemonContext context;
   private Context cxt;
 
-  private Logger logger = LogManager.getLogger("Bireme." + Bireme.class);
+  private Logger logger = LogManager.getLogger("Bireme");
 
   private ConsoleReporter consoleReporter;
   private JmxReporter jmxReporter;
@@ -152,7 +153,7 @@ public class Bireme implements Daemon {
   }
 
   protected void createPipeLine() {
-    for (SourceConfig conf : cxt.conf.sourceConfig) {
+    for (SourceConfig conf : cxt.conf.sourceConfig.values()) {
       switch (conf.type) {
         case MAXWELL:
           KafkaConsumer<String, String> consumer =
@@ -160,13 +161,17 @@ public class Bireme implements Daemon {
           Iterator<PartitionInfo> iter = consumer.partitionsFor(conf.topic).iterator();
 
           while (iter.hasNext()) {
-            cxt.pipeLines.add(new MaxwellPipeLine(cxt, conf, iter.next().partition()));
+            PipeLine pipeLine = new MaxwellPipeLine(cxt, conf, iter.next().partition());
+            cxt.pipeLines.add(pipeLine);
+            conf.pipeLines.add(pipeLine);
           }
           break;
 
         case DEBEZIUM:
           for (String sourceTable : conf.tableMap.keySet()) {
-            cxt.pipeLines.add(new DebeziumPipeLine(cxt, conf, sourceTable));
+            PipeLine pipeLine = new DebeziumPipeLine(cxt, conf, sourceTable);
+            cxt.pipeLines.add(pipeLine);
+            conf.pipeLines.add(pipeLine);
           }
           break;
 
@@ -183,12 +188,12 @@ public class Bireme implements Daemon {
   protected void startReporter() {
     switch (cxt.conf.reporter) {
       case "console":
-        consoleReporter = ConsoleReporter.forRegistry(cxt.metrics).convertRatesTo(TimeUnit.SECONDS)
+        consoleReporter = ConsoleReporter.forRegistry(cxt.register).convertRatesTo(TimeUnit.SECONDS)
             .convertDurationsTo(TimeUnit.MILLISECONDS).build();
         consoleReporter.start(cxt.conf.report_interval, TimeUnit.SECONDS);
         break;
       case "jmx":
-        jmxReporter = JmxReporter.forRegistry(cxt.metrics).build();
+        jmxReporter = JmxReporter.forRegistry(cxt.register).build();
         jmxReporter.start();
         break;
       default:
@@ -239,7 +244,7 @@ public class Bireme implements Daemon {
     cxt.stop = true;
     logger.info("set stop flag to true");
 
-    cxt.waitForExit();  
+    cxt.waitForExit();
     logger.info("Bireme exit");
   }
 
@@ -263,7 +268,7 @@ public class Bireme implements Daemon {
       start();
       cxt.waitForStop();
     } catch (Exception e) {
-      logger.fatal("Bireme is going to exit since: {}", e.getMessage());
+      logger.fatal("Bireme stop abnormally since: {}", e.getMessage());
       logger.fatal("Stack Trace: ", e);
     }
 

@@ -27,12 +27,12 @@ public class Dispatcher {
     this.cache = pipeLine.cache;
   }
 
-  public Long start() throws BiremeException {
+  public void dispatch() throws BiremeException {
     if (rowSet != null) {
       complete = insertRowSet();
 
       if (!complete) {
-        return 0L;
+        return;
       }
     }
 
@@ -58,8 +58,6 @@ public class Dispatcher {
         break;
       }
     }
-
-    return 0L;
   }
 
   private boolean insertRowSet() {

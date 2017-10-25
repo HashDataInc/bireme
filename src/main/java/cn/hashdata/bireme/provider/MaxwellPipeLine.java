@@ -22,11 +22,11 @@ import cn.hashdata.bireme.Row.RowType;
 
 public class MaxwellPipeLine extends KafkaPipeLine {
   public MaxwellPipeLine(Context cxt, SourceConfig conf, int partitionID) {
-    super(cxt, conf);
+    super(cxt, conf, "Maxwell-" + conf.name + "-" + conf.topic + "-" + partitionID);
     consumer.assign(Arrays.asList(new TopicPartition(conf.topic, partitionID)));
 
-    logger = LogManager
-        .getLogger("Bireme." + MaxwellPipeLine.class + ": " + conf.topic + "->" + partitionID);
+    logger = LogManager.getLogger("Bireme." + myName);
+    logger.info("Create new Maxwell Pipeline. Name: {}", myName);
   }
 
   @Override
@@ -41,7 +41,7 @@ public class MaxwellPipeLine extends KafkaPipeLine {
    * @author yuze
    *
    */
-  public class MaxwellTransformer extends KafkaTransformer {
+  class MaxwellTransformer extends KafkaTransformer {
     HashMap<String, String> tableMap;
 
     public MaxwellTransformer() {
@@ -118,7 +118,7 @@ public class MaxwellPipeLine extends KafkaPipeLine {
       return true;
     }
 
-    public class MaxwellRecord implements Record {
+    class MaxwellRecord implements Record {
       public String dataSource;
       public String database;
       public String table;
