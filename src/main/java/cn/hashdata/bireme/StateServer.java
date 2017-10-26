@@ -136,10 +136,8 @@ public class StateServer {
       Gson gson = null;
 
       if (format != null) {
-        gson = new GsonBuilder()
-                   .setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
-                   .setPrettyPrinting()
-                   .create();
+        gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").setPrettyPrinting()
+            .create();
       } else {
         gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").create();
       }
@@ -167,9 +165,9 @@ public class StateServer {
         String name = p.myName;
         PipeLineStat stat = p.stat;
         Date newest_record = new Date(stat.newestCompleted);
-        double average_delay = stat.avgDelay.getMeanRate();
+        long delay = stat.delay;
 
-        e.pipelines.add(new Stat(name, newest_record, average_delay));
+        e.pipelines.add(new Stat(name, newest_record, delay));
       }
 
       return e;
@@ -179,12 +177,12 @@ public class StateServer {
   class Stat {
     String name;
     Date newest_record;
-    double average_delay;
+    double delay;
 
-    public Stat(String name, Date newest_record, double average_delay) {
+    public Stat(String name, Date newest_record, long delay) {
       this.name = name;
       this.newest_record = newest_record;
-      this.average_delay = average_delay;
+      this.delay = delay / 1000.0;
     }
   }
   class Source {

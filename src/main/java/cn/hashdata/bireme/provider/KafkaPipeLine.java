@@ -100,8 +100,7 @@ public abstract class KafkaPipeLine extends PipeLine {
       HashMap<String, Long> offsets = ((KafkaCommitCallback) callback).partitionOffset;
       Row row = null;
 
-      for (ConsumerRecord<String, String> change :
-          (ConsumerRecords<String, String>) changeSet.changes) {
+      for (ConsumerRecord<String, String> change : (ConsumerRecords<String, String>) changeSet.changes) {
         try {
           row = cxt.idleRows.borrowObject();
         } catch (Exception e) {
@@ -139,12 +138,14 @@ public abstract class KafkaPipeLine extends PipeLine {
   public class KafkaCommitCallback extends AbstractCommitCallback {
     public HashMap<String, Long> partitionOffset;
     private Timer.Context timerCTX;
+    private Date start;
 
     public KafkaCommitCallback() {
       this.partitionOffset = new HashMap<String, Long>();
 
       // record the time being created
       timerCTX = stat.avgDelay.time();
+      start = new Date();
     }
 
     @Override
@@ -164,8 +165,9 @@ public abstract class KafkaPipeLine extends PipeLine {
 
       // record the time being committed
       timerCTX.stop();
-      // Update the
+
       stat.newestCompleted = newestRecord;
+      stat.delay = new Date().getTime() - start.getTime();
     }
   }
 

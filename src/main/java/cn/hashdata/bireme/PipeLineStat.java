@@ -27,6 +27,7 @@ import cn.hashdata.bireme.provider.PipeLine;
 public class PipeLineStat {
   private String pipeLineName;
   public Long newestCompleted = 0L;
+  public Long delay = 0L;
 
   private PipeLine pipeLine;
   private MetricRegistry register;
