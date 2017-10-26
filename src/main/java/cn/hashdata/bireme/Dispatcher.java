@@ -76,7 +76,11 @@ public class Dispatcher {
     HashMap<String, ArrayList<Row>> bucket = rowSet.rowBucket;
     boolean complete = true;
 
-    for (Entry<String, ArrayList<Row>> entry : bucket.entrySet()) {
+    ArrayList < Entry < String, ArrayList<Row>>> entrySet = new ArrayList < Entry < String,
+                                                 ArrayList<Row>>>();
+    entrySet.addAll(bucket.entrySet());
+
+    for (Entry<String, ArrayList<Row>> entry : entrySet) {
       String fullTableName = entry.getKey();
       ArrayList<Row> rows = entry.getValue();
       RowCache rowCache = cache.get(fullTableName);
