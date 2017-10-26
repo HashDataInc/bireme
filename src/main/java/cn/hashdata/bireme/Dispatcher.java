@@ -8,8 +8,15 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import cn.hashdata.bireme.provider.PipeLine;
+import cn.hashdata.bireme.pipeline.PipeLine;
 
+/**
+ * A {@code Dispatcher} is binded with a {@code PipeLine}. It get the transform result and insert
+ * into cache.
+ *
+ * @author yuze
+ *
+ */
 public class Dispatcher {
   public Context cxt;
   public PipeLine pipeLine;
@@ -27,6 +34,11 @@ public class Dispatcher {
     this.cache = pipeLine.cache;
   }
 
+  /**
+   * Get the transform result and dispatch.
+   *
+   * @throws BiremeException transform failed
+   */
   public void dispatch() throws BiremeException {
     if (rowSet != null) {
       complete = insertRowSet();

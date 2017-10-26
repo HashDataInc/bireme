@@ -8,18 +8,10 @@ import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 
-import cn.hashdata.bireme.provider.PipeLine;
+import cn.hashdata.bireme.pipeline.PipeLine;
 
 /**
- * {@code LoadState} document current state for {@code ChangeLoader}. It is in connection with
- * {@code LoadTask}. Each {@code LoadState} has three kinds of times.
- * <ul>
- * <li><B> produceTime </B> The time when Change Data Capture (CDC) produced the record. For each
- * origin table, LoadState documents the latest produceTime in the corresponding LoadTask.</li>
- * <li><B> receiveTime </B> The time when Bireme received the record. LoadState documents the
- * earliest receiveTime for each origin table in the corresponding LoadTask.</li>
- * <li><B> completeTime </B> The time when ChangeLoader successfully loaded the LoadTask.</li>
- * </ul>
+ * {@code PipeLineStat} contains the statistics about the {@code PipeLine}.
  *
  * @author yuze
  *
@@ -76,6 +68,12 @@ public class PipeLineStat {
     register.register(MetricRegistry.name(pipeLineName, "TransformQueueSize"), transformQueueSize);
   }
 
+  /**
+   * Add {@code Gauge} for a {@link RowCache} to get the size.
+   *
+   * @param table the name of the cache
+   * @param cache the {@code RowCache} itselff
+   */
   public void addGaugeForCache(String table, RowCache cache) {
     Gauge<Long> gauge = new Gauge<Long>() {
 
@@ -90,6 +88,17 @@ public class PipeLineStat {
     register.register(MetricRegistry.name(pipeLineName, table, "Cache"), gauge);
   }
 
+  /**
+   * Add {@code Timer}s for a {@link ChangeLoader}. Each {@code ChangeLoader} has three Timer.
+   * <ul>
+   * <li>Record the time of copy followed by delete</li>
+   * <li>Record the time of delete</li>
+   * <li>Record the time of insert in copy way</li>
+   * </ul>
+   *
+   * @param table the {@code ChangeLoader}'s table
+   * @return the registered Timer
+   */
   public Timer[] addTimerForLoader(String table) {
     Timer[] timers = new Timer[3];
     timers[0] = register.timer(MetricRegistry.name(pipeLineName, table, "Loader", "CopyForDelete"));

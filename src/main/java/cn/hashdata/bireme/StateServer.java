@@ -20,8 +20,8 @@ import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-import cn.hashdata.bireme.provider.PipeLine;
-import cn.hashdata.bireme.provider.SourceConfig;
+import cn.hashdata.bireme.pipeline.PipeLine;
+import cn.hashdata.bireme.pipeline.SourceConfig;
 
 import org.eclipse.jetty.server.Request;
 
@@ -136,8 +136,10 @@ public class StateServer {
       Gson gson = null;
 
       if (format != null) {
-        gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").setPrettyPrinting()
-            .create();
+        gson = new GsonBuilder()
+                   .setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+                   .setPrettyPrinting()
+                   .create();
       } else {
         gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").create();
       }

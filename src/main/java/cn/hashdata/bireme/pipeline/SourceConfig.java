@@ -2,11 +2,19 @@
  * Copyright HashData. All Rights Reserved.
  */
 
-package cn.hashdata.bireme.provider;
+package cn.hashdata.bireme.pipeline;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 
+/**
+ * {@code SourceConfig} store the information about the source. {@link SourceConfig#tableMap}
+ * maintain a kv set where key is the source table and value is the target table.
+ * {@link SourceConfig#pipeLines} are the {@link PipeLine}s that belong to this source.
+ *
+ * @author yuze
+ *
+ */
 public class SourceConfig {
   public enum SourceType { MAXWELL, DEBEZIUM }
 
@@ -15,7 +23,7 @@ public class SourceConfig {
   public HashMap<String, String> tableMap;
   public ArrayList<PipeLine> pipeLines;
 
-  // config for Kafka PipeLine
+  // configuration for Kafka PipeLine
   public String topic;
   public String server;
   public String groupID;

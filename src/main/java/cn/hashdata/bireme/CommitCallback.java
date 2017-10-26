@@ -5,7 +5,8 @@
 package cn.hashdata.bireme;
 
 /**
- * {@code CommitCallback} is called after a loadtask successfully completed.
+ * {@code CommitCallback} traces a {@link ChangeSet}. After the {@code ChangeSet} is loaded, mark it
+ * as committed.
  *
  * @author yuze
  *
@@ -38,6 +39,7 @@ public interface CommitCallback {
 
   /**
    * Set the produce time of the newest record in corresponding set
+   * @param time the produce time
    */
   public void setNewestRecord(Long time);
 }

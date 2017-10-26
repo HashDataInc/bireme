@@ -1,4 +1,4 @@
-package cn.hashdata.bireme.provider;
+package cn.hashdata.bireme.pipeline;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -20,6 +20,12 @@ import cn.hashdata.bireme.Row;
 import cn.hashdata.bireme.Table;
 import cn.hashdata.bireme.Row.RowType;
 
+/**
+ * {@code MaxwellPipeLine} is a kind of {@code KafkaPipeLine} whose change data coming from Maxwell.
+ *
+ * @author yuze
+ *
+ */
 public class MaxwellPipeLine extends KafkaPipeLine {
   public MaxwellPipeLine(Context cxt, SourceConfig conf, int partitionID) {
     super(cxt, conf, "Maxwell-" + conf.name + "-" + conf.topic + "-" + partitionID);

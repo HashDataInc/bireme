@@ -10,7 +10,8 @@ import java.util.HashSet;
 
 /**
  * {@code LoadTask} is the result of merge operation. A {@code LoadTask} contains a set of data to
- * delete and another set of data to insert. Besides, it also contains positions to be update.
+ * delete and another set of data to insert. Besides, it also contains {code CommitCallback} to be
+ * committed.
  *
  * @author yuze
  *
@@ -23,7 +24,6 @@ public class LoadTask {
   /**
    * Create a new {@code LoadTask}.
    *
-   * @param tableName the table this task will be loaded to.
    */
   public LoadTask() {
     this.callbacks = new ArrayList<CommitCallback>();

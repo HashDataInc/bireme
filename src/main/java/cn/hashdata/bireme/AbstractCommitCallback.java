@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * {@code AbstractCommitCallback} is an implements of {@code CommitCallback}, it can only commit
- * after all corresponding loader finish loading their task.
+ * after all corresponding {@link ChangeLoader} finish their task.
  *
  * @author yuze
  *

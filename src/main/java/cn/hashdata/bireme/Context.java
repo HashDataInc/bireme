@@ -27,7 +27,7 @@ import cn.hashdata.bireme.ChangeSet.ChangeSetFactory;
 import cn.hashdata.bireme.Row.RowArrayFactory;
 import cn.hashdata.bireme.Row.RowFactory;
 import cn.hashdata.bireme.RowSet.RowSetFactory;
-import cn.hashdata.bireme.provider.PipeLine;
+import cn.hashdata.bireme.pipeline.PipeLine;
 
 /**
  * bireme context.
@@ -112,8 +112,8 @@ public class Context {
   private void createThreadPool() {
     pipeLinePool =
         Executors.newFixedThreadPool(conf.pipeline_pool_size, new BiremeThreadFactory("PipeLine"));
-    transformerPool = Executors.newFixedThreadPool(conf.transform_pool_size,
-        new BiremeThreadFactory("Dispatcher"));
+    transformerPool = Executors.newFixedThreadPool(
+        conf.transform_pool_size, new BiremeThreadFactory("Dispatcher"));
     mergerPool =
         Executors.newFixedThreadPool(conf.merge_pool_size, new BiremeThreadFactory("Merger"));
     loaderPool =
@@ -148,17 +148,19 @@ public class Context {
     watchDog.start();
   }
 
+  /**
+   * Start the {@code Scheduler} to schedule the {@code PipeLines} to work.
+   */
   public void startScheduler() {
     scheduleResult = schedule.submit(new Scheduler(this));
     server.start();
   }
 
   /**
-   * Wait for all threads to exit.
+   * Wait for bireme to stop and shout down all thread pool.
    *
-   * @param ignoreError whether to ignore error.
    * @throws InterruptedException if interrupted while waiting
-   * @throws BiremeException Schedule Exception
+   * @throws BiremeException scheduler throw out Exception
    */
   public void waitForStop() throws InterruptedException, BiremeException {
     try {
@@ -178,6 +180,9 @@ public class Context {
     }
   }
 
+  /**
+   * Wait for all thread pool to terminate.
+   */
   public void waitForExit() {
     try {
       schedule.awaitTermination(1, TimeUnit.MINUTES);
@@ -190,7 +195,12 @@ public class Context {
   }
 }
 
-
+/**
+ * For create new Thread.
+ *
+ * @author yuze
+ *
+ */
 class BiremeThreadFactory implements ThreadFactory {
   private final ThreadGroup group;
   private final AtomicInteger threadNumber = new AtomicInteger(1);

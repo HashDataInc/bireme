@@ -1,4 +1,4 @@
-package cn.hashdata.bireme.provider;
+package cn.hashdata.bireme.pipeline;
 
 import java.sql.Types;
 import java.util.ArrayList;
@@ -24,6 +24,19 @@ import cn.hashdata.bireme.RowCache;
 import cn.hashdata.bireme.RowSet;
 import cn.hashdata.bireme.Table;
 
+/**
+ * {@code PipeLine} is a bridge between data source and target table. The data flow order is
+ * guaranteed. A {@code PipeLine} does four things as follows:
+ * <ul>
+ * <li>Poll data and allocate {@link Transformer} to convert the data.</li>
+ * <li>Dispatch the transformed data and insert it into {@link RowCache}.</li>
+ * <li>Drive the {@code RowBatchMerger} to work</li>
+ * <li>Drivet the {@code ChangeLoader} to work</li>
+ * </ul>
+ *
+ * @author yuze
+ *
+ */
 public abstract class PipeLine implements Callable<PipeLine> {
   public enum PipeLineState { NORMAL, ERROR, STOP }
 
@@ -152,10 +165,25 @@ public abstract class PipeLine implements Callable<PipeLine> {
     return this;
   }
 
+  /**
+   * Poll a set of change data from source and pack it to {@link ChangeSet}.
+   *
+   * @return a packed change set
+   * @throws BiremeException Exceptions when poll data from source
+   */
   public abstract ChangeSet pollChangeSet() throws BiremeException;
 
+  /**
+   * Check whether the loading operation is complete. If true, commit it.
+   *
+   */
   public abstract void checkAndCommit();
 
+  /**
+   * Create a new {@link Transformer} to work parallel.
+   *
+   * @return a new {@code Transformer}
+   */
   public abstract Transformer createTransformer();
 
   private void startTransform(Transformer trans) {
@@ -165,16 +193,16 @@ public abstract class PipeLine implements Callable<PipeLine> {
   }
 
   /**
-   * Get the unique name for the provider, which is specified in the configuration file.
+   * Get the unique name for the {@code PipeLine}.
    *
-   * @return the name for the provider
+   * @return the name for the {@code PipeLine}
    */
   public String getPipeLineName() {
     return conf.name;
   }
 
   /**
-   * {@code Transformer} convert a group of change data to unified form.
+   * {@code Transformer} convert a group of change data to unified form {@link Row}.
    *
    * @author yuze
    *

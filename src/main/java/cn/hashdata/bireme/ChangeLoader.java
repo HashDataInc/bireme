@@ -29,11 +29,12 @@ import org.postgresql.core.BaseConnection;
 
 import com.codahale.metrics.Timer;
 
-import cn.hashdata.bireme.provider.PipeLine;
+import cn.hashdata.bireme.pipeline.PipeLine;
 
 /**
  * {@code ChangeLoader} poll tasks and load the tasks to database. Each {@code ChangeLoader}
- * corresponds to a specific table. All {@code ChangeLoaders} share connections to the database.
+ * corresponds to a specific table in a {@code PipeLine}. All {@code ChangeLoaders} share
+ * connections to the database.
  *
  * @author yuze
  *
@@ -63,8 +64,10 @@ public class ChangeLoader implements Callable<Long> {
   /**
    * Create a new {@code ChangeLoader}.
    *
-   * @param cxt bireme context
-   * @param mappedTable the corresponding table
+   * @param cxt the Bireme Context
+   * @param pipeLine the {@code PipeLine} belongs to
+   * @param mappedTable the target table
+   * @param taskIn a queue to get {@code LoadTask}
    */
   public ChangeLoader(Context cxt, PipeLine pipeLine, String mappedTable,
       LinkedBlockingQueue<Future<LoadTask>> taskIn) {
@@ -81,7 +84,7 @@ public class ChangeLoader implements Callable<Long> {
     copyForDeleteTimer = timers[0];
     deleteTimer = timers[1];
     copyForInsertTimer = timers[2];
-    
+
     logger = pipeLine.logger;
   }
 
@@ -114,12 +117,14 @@ public class ChangeLoader implements Callable<Long> {
       try {
         executeTask();
       } catch (InterruptedException | BiremeException e) {
-        // add log
+        logger.error("Fail to execute task. Message: {}", e.getMessage());
+
         try {
           conn.rollback();
         } catch (Exception ignore) {
-          // TODO add log
+          logger.error("Fail to roll back after load exception. Message: {}", e.getMessage());
         }
+
         throw e;
       } finally {
         releaseConnection();
@@ -159,7 +164,8 @@ public class ChangeLoader implements Callable<Long> {
   /**
    * Get connection to the destination database from connection pool.
    *
-   * @throws BiremeException - wrap and throw Exception which cannot be handled
+   * @return the connection
+   * @throws BiremeException when unable to create temporary table
    */
   protected Connection getConnection() throws BiremeException {
     Connection connection = cxt.loaderConnections.poll();
@@ -184,8 +190,8 @@ public class ChangeLoader implements Callable<Long> {
   /**
    * Load the task to destination database. First load the delete set and then load the insert set.
    *
-   * @throws BiremeException - Wrap and throw Exception which cannot be handled
-   * @throws InterruptedException - if interrupted while waiting
+   * @throws BiremeException Wrap the exception when load the task
+   * @throws InterruptedException if interrupted while waiting
    */
   protected void executeTask() throws BiremeException, InterruptedException {
     if (!currentTask.delete.isEmpty() || (!optimisticMode && !currentTask.insert.isEmpty())) {

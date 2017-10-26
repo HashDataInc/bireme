@@ -16,8 +16,8 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import cn.hashdata.bireme.provider.SourceConfig;
-import cn.hashdata.bireme.provider.SourceConfig.SourceType;
+import cn.hashdata.bireme.pipeline.SourceConfig;
+import cn.hashdata.bireme.pipeline.SourceConfig.SourceType;
 
 /**
  * Configurations about bireme.
@@ -115,7 +115,6 @@ public class Config {
    * Get the connection configuration to database.
    *
    * @param prefix "target" database
-   * @return {@code ConnectionConfig} to database.
    * @throws BiremeException when url of database is null
    */
   protected void connectionConfig(String prefix) throws BiremeException {
@@ -266,6 +265,7 @@ public class Config {
    */
   public void logConfig() {
     String config = "Configures: "
+        + "\n\tpipeline thread pool size = " + pipeline_pool_size
         + "\n\ttransform thread pool size = " + transform_pool_size + "\n\ttransform queue size = "
         + transform_queue_size + "\n\trow cache size = " + row_cache_size
         + "\n\tmerge thread pool size = " + merge_pool_size

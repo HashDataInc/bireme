@@ -34,11 +34,11 @@ import org.apache.logging.log4j.Logger;
 import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.JmxReporter;
 
-import cn.hashdata.bireme.provider.DebeziumPipeLine;
-import cn.hashdata.bireme.provider.KafkaPipeLine;
-import cn.hashdata.bireme.provider.MaxwellPipeLine;
-import cn.hashdata.bireme.provider.PipeLine;
-import cn.hashdata.bireme.provider.SourceConfig;
+import cn.hashdata.bireme.pipeline.DebeziumPipeLine;
+import cn.hashdata.bireme.pipeline.KafkaPipeLine;
+import cn.hashdata.bireme.pipeline.MaxwellPipeLine;
+import cn.hashdata.bireme.pipeline.PipeLine;
+import cn.hashdata.bireme.pipeline.SourceConfig;
 
 /**
  * {@code Bireme} is an incremental synchronization tool. It could sync update in MySQL to GreenPlum
@@ -92,6 +92,11 @@ public class Bireme implements Daemon {
     cxt = new Context(new Config(config));
   }
 
+  /**
+   * Get metadata about the table from target database.
+   *
+   * @throws BiremeException when fail to connect or get the metadata
+   */
   protected void getTableInfo() throws BiremeException {
     logger.info("Start getting metadata of target tables from target database.");
 
@@ -115,6 +120,11 @@ public class Bireme implements Daemon {
     logger.info("Finish getting metadata of target tables from target database.");
   }
 
+  /**
+   * Establish connections to the target database.
+   *
+   * @throws BiremeException fail to connect
+   */
   protected void initLoaderConnections() throws BiremeException {
     logger.info("Start establishing connections for loaders.");
 
@@ -150,6 +160,12 @@ public class Bireme implements Daemon {
     }
 
     logger.info("Finishing establishing {} connections for loaders.", cxt.conf.loader_conn_size);
+  }
+
+  protected void closeConnections() throws SQLException {
+    for (Connection conn : cxt.loaderConnections) {
+      conn.close();
+    }
   }
 
   protected void createPipeLine() {
@@ -188,8 +204,10 @@ public class Bireme implements Daemon {
   protected void startReporter() {
     switch (cxt.conf.reporter) {
       case "console":
-        consoleReporter = ConsoleReporter.forRegistry(cxt.register).convertRatesTo(TimeUnit.SECONDS)
-            .convertDurationsTo(TimeUnit.MILLISECONDS).build();
+        consoleReporter = ConsoleReporter.forRegistry(cxt.register)
+                              .convertRatesTo(TimeUnit.SECONDS)
+                              .convertDurationsTo(TimeUnit.MILLISECONDS)
+                              .build();
         consoleReporter.start(cxt.conf.report_interval, TimeUnit.SECONDS);
         break;
       case "jmx":
@@ -245,6 +263,13 @@ public class Bireme implements Daemon {
     logger.info("set stop flag to true");
 
     cxt.waitForExit();
+
+    try {
+      closeConnections();
+    } catch (SQLException e) {
+      logger.warn(e.getMessage());
+    }
+
     logger.info("Bireme exit");
   }
 
@@ -253,6 +278,11 @@ public class Bireme implements Daemon {
     logger.info("destroy Bireme daemon");
   }
 
+  /**
+   * An entry to start {@code Bireme}.
+   *
+   * @param args arguments from command line.
+   */
   public void entry(String[] args) {
     try {
       parseCommandLine(args);
@@ -273,6 +303,13 @@ public class Bireme implements Daemon {
     }
 
     cxt.waitForExit();
+
+    try {
+      closeConnections();
+    } catch (SQLException e) {
+      logger.warn(e.getMessage());
+    }
+
     logger.info("Bireme exit");
   }
 

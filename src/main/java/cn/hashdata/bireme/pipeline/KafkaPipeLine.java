@@ -1,4 +1,4 @@
-package cn.hashdata.bireme.provider;
+package cn.hashdata.bireme.pipeline;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -21,6 +21,12 @@ import cn.hashdata.bireme.Context;
 import cn.hashdata.bireme.Row;
 import cn.hashdata.bireme.RowSet;
 
+/**
+ * {@code KafkaPipeLine} is a kind of {@code PipeLine} that polls data from Kafka.
+ *
+ * @author yuze
+ *
+ */
 public abstract class KafkaPipeLine extends PipeLine {
   protected KafkaConsumer<String, String> consumer;
   protected LinkedBlockingQueue<KafkaCommitCallback> commitCallbacks;
@@ -100,7 +106,8 @@ public abstract class KafkaPipeLine extends PipeLine {
       HashMap<String, Long> offsets = ((KafkaCommitCallback) callback).partitionOffset;
       Row row = null;
 
-      for (ConsumerRecord<String, String> change : (ConsumerRecords<String, String>) changeSet.changes) {
+      for (ConsumerRecord<String, String> change :
+          (ConsumerRecords<String, String>) changeSet.changes) {
         try {
           row = cxt.idleRows.borrowObject();
         } catch (Exception e) {
@@ -135,6 +142,13 @@ public abstract class KafkaPipeLine extends PipeLine {
         throws BiremeException;
   }
 
+  /**
+   * {@code KafkaCommitCallback} is used to trace a {@code ChangeSet} polled from Kafka. After the
+   * change data has been applied, commit the offset to Kafka.
+   *
+   * @author yuze
+   *
+   */
   public class KafkaCommitCallback extends AbstractCommitCallback {
     public HashMap<String, Long> partitionOffset;
     private Timer.Context timerCTX;
@@ -171,12 +185,19 @@ public abstract class KafkaPipeLine extends PipeLine {
     }
   }
 
+  /**
+   * Create a new KafkaConsumer, specify the server's ip and port, and groupID.
+   *
+   * @param server ip and port for Kafka server
+   * @param groupID consumer's group id
+   * @return the consumer
+   */
   public static KafkaConsumer<String, String> createConsumer(String server, String groupID) {
     Properties props = new Properties();
     props.put("bootstrap.servers", server);
     props.put("group.id", groupID);
     props.put("enable.auto.commit", false);
-    props.put("session.timeout.ms", 30000);
+    props.put("session.timeout.ms", 60000);
     props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
     props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
     props.put("auto.offset.reset", "earliest");

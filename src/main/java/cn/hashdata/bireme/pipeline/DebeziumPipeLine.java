@@ -1,4 +1,4 @@
-package cn.hashdata.bireme.provider;
+package cn.hashdata.bireme.pipeline;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -30,6 +30,13 @@ import cn.hashdata.bireme.Row;
 import cn.hashdata.bireme.Table;
 import cn.hashdata.bireme.Row.RowType;
 
+/**
+ * {@code DebeziumPipeLine} is a kind of {@code KafkaPipeLine} whose change data coming from
+ * Debezium.
+ *
+ * @author yuze
+ *
+ */
 public class DebeziumPipeLine extends KafkaPipeLine {
   public DebeziumPipeLine(Context cxt, SourceConfig conf, String topic) {
     super(cxt, conf, "Debezium-" + conf.name + "-" + topic);

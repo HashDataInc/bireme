@@ -5,7 +5,7 @@
 package cn.hashdata.bireme;
 
 /**
- * {@code BiremeException} is used to wrap {@code Exception} bireme cannot handle by itself.
+ * {@code BiremeException} is used to wrap Exceptions bireme cannot handle by itself.
  *
  * @author yuze
  *

@@ -11,9 +11,16 @@ import java.util.concurrent.Future;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import cn.hashdata.bireme.provider.PipeLine;
-import cn.hashdata.bireme.provider.PipeLine.PipeLineState;
+import cn.hashdata.bireme.pipeline.PipeLine;
+import cn.hashdata.bireme.pipeline.PipeLine.PipeLineState;
 
+/**
+ * {@code Scheduler} collects all {@code PipeLine}. Successively and constantly drive the
+ * {@code PipeLine}s to work.
+ *
+ * @author yuze
+ *
+ */
 public class Scheduler implements Callable<Long> {
   public Logger logger = LogManager.getLogger("Bireme.Scheduler");
 

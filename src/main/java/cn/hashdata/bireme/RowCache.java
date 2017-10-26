@@ -13,10 +13,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import cn.hashdata.bireme.provider.PipeLine;
+import cn.hashdata.bireme.pipeline.PipeLine;
 
 /**
- * An in-memory cache for {@code Row}. We use cache to merge and load operations in batch.
+ * An in-memory cache for {@link Row}. We use cache to merge and load change data in batch.
  * {@code Rows} are separated by its destination table. In each cache, {@code Rows} are ordered.
  *
  * @author yuze
@@ -44,8 +44,9 @@ public class RowCache {
   /**
    * Create cache for a destination table.
    *
-   * @param cxt The bireme context.
-   * @param tableName The table name to cached.
+   * @param cxt the bireme context
+   * @param tableName the table name to cached
+   * @param pipeLine the pipeLine belongs to which
    */
   public RowCache(Context cxt, String tableName, PipeLine pipeLine) {
     this.cxt = cxt;
@@ -76,8 +77,8 @@ public class RowCache {
    * while when there is no available space in the cache.
    *
    * @param newRows the array of {@code Rows}
-   * @param callback the corresponding {@code CommitCallback}
-   * @throws BiremeException when cache has enough but cannot add to cache
+   * @param callback callback the corresponding {@code CommitCallback}
+   * @return true if successfully add to cache
    */
   public boolean addRows(ArrayList<Row> newRows, CommitCallback callback) {
     if (rows.remainingCapacity() < newRows.size()) {
@@ -90,6 +91,11 @@ public class RowCache {
     return true;
   }
 
+  /**
+   * Whether reach the threshold to merge.
+   *
+   * @return true if reach the threshold to merge
+   */
   public boolean shouldMerge() {
     if (new Date().getTime() - lastMergeTime < mergeInterval && rows.size() < batchSize) {
       return false;
@@ -97,6 +103,11 @@ public class RowCache {
     return true;
   }
 
+  /**
+   * Drain current {@code Row} in cache and allocate a {@code RowbatchMerget} to merge.
+   *
+   * @throws BiremeException Exception
+   */
   public void startMerge() throws BiremeException {
     if (mergeResult.remainingCapacity() == 0 || rows.isEmpty()) {
       return;
@@ -124,6 +135,13 @@ public class RowCache {
     localMerger.add(merger);
   }
 
+  /**
+   * Start {@code ChangeLoader} to work
+   *
+   * @throws InterruptedException interrupted when get the result of last call to
+   *         {@code ChangeLoader}.
+   * @throws ExecutionException last call to {@code ChangeLoader} throw an Exception.
+   */
   public void startLoad() throws InterruptedException, ExecutionException {
     Future<LoadTask> head = mergeResult.peek();
 
@@ -141,8 +159,8 @@ public class RowCache {
   }
 
   /**
-   * {@code RowBatchMerger} accepts a batch of {@code Rows}, merge them and create a
-   * {@code LoadTask}.
+   * {@code RowBatchMerger} accepts a batch of {@code Rows} and its corresponding
+   * {@code CommitCallback}, merge them and create a {@code LoadTask}.
    *
    * @author yuze
    *
@@ -152,15 +170,11 @@ public class RowCache {
     protected ArrayList<CommitCallback> callbacks;
 
     /**
-     * Create a RowBatchMerger.
+     * Set the rows for merge.
      *
-     * @param cxt The bireme context
-     * @param mappedTableName the destination table
-     * @param rows batch of {@code Rows} to be merged
-     * @param callbacks the {@code CommitCallbacks} in this batch.
+     * @param rows the {@code Row}s for merge
+     * @param callbacks the corresponding {@code CommitCallback}
      */
-    public RowBatchMerger() {}
-
     public void setBatch(ArrayList<Row> rows, ArrayList<CommitCallback> callbacks) {
       this.rows = rows;
       this.callbacks = callbacks;
