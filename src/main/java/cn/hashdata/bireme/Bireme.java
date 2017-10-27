@@ -245,6 +245,7 @@ public class Bireme implements Daemon {
 
     createPipeLine();
     cxt.startScheduler();
+    startReporter();
 
     if (context != null) {
       cxt.startWatchDog(context.getController());
