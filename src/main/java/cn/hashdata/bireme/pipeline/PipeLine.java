@@ -230,18 +230,11 @@ public abstract class PipeLine implements Callable<PipeLine> {
      */
     @Override
     public RowSet call() throws BiremeException {
-      RowSet rowSet = null;
-
-      try {
-        rowSet = cxt.idleRowSets.borrowObject();
-      } catch (Exception e) {
-        String message = "Can't not borrow RowSet from the Object Pool.";
-        throw new BiremeException(message, e);
-      }
+      RowSet rowSet = new RowSet();
 
       fillRowSet(rowSet);
 
-      cxt.idleChangeSets.returnObject(changeSet);
+      changeSet.destory();
       changeSet = null;
 
       return rowSet;
@@ -468,7 +461,7 @@ public abstract class PipeLine implements Callable<PipeLine> {
 
       if (array == null) {
         try {
-          array = cxt.idleRowArrays.borrowObject();
+          array = new ArrayList<Row>();
         } catch (Exception e) {
           String message = "Can't not borrow RowArray from the Object Pool.";
           throw new BiremeException(message, e);

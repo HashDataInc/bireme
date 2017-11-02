@@ -96,11 +96,11 @@ public class Dispatcher {
       }
 
       bucket.remove(fullTableName);
-      cxt.idleRowArrays.returnObject(rows);
+      rows.clear();
     }
 
     if (complete) {
-      cxt.idleRowSets.returnObject(rowSet);
+      rowSet.destory();
       rowSet = null;
     }
 

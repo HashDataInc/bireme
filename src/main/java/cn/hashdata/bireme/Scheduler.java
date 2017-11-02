@@ -42,7 +42,7 @@ public class Scheduler implements Callable<Long> {
   }
 
   @Override
-  public Long call() throws BiremeException {
+  public Long call() throws BiremeException, InterruptedException {
     logger.info("Scheduler start working.");
 
     PipeLine pipeLine = null;
@@ -76,10 +76,10 @@ public class Scheduler implements Callable<Long> {
 
           try {
             complete = result.get();
-          } catch (ExecutionException | InterruptedException e) {
+          } catch (ExecutionException e) {
             logger.warn("Pipeline throw out exception. Message {}", e.getMessage());
 
-            throw new BiremeException("PipeLine shouldn't throw out exception.", e);
+            throw new BiremeException("Wrap Throwable.", e.getCause());
           }
 
           pipeLineQueue.add(complete);

@@ -52,4 +52,11 @@ public abstract class AbstractCommitCallback implements CommitCallback {
       newestRecord = time;
     }
   }
+
+  @Override
+  public void destory() {
+    numOfCommitedTables = null;
+    committed = null;
+    ready = null;
+  }
 }

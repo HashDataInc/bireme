@@ -39,7 +39,13 @@ public interface CommitCallback {
 
   /**
    * Set the produce time of the newest record in corresponding set
+   *
    * @param time the produce time
    */
   public void setNewestRecord(Long time);
+
+  /**
+   * Destory this {@code CommitCallback} release the memory
+   */
+  public void destory();
 }

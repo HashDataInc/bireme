@@ -128,7 +128,7 @@ public class ChangeLoader implements Callable<Long> {
         throw e;
       } finally {
         releaseConnection();
-        currentTask.reset();
+        currentTask.destory();
         currentTask = null;
         conn = null;
       }

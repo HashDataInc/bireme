@@ -31,7 +31,7 @@ public class LoadTask {
     this.insert = new HashMap<String, String>();
   }
 
-  public void reset() {
+  public void destory() {
     callbacks.clear();
     delete.clear();
     insert.clear();

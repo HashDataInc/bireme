@@ -18,15 +18,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.daemon.DaemonController;
-import org.apache.commons.pool2.impl.GenericObjectPool;
-import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
 import com.codahale.metrics.MetricRegistry;
 
-import cn.hashdata.bireme.ChangeSet.ChangeSetFactory;
-import cn.hashdata.bireme.Row.RowArrayFactory;
-import cn.hashdata.bireme.Row.RowFactory;
-import cn.hashdata.bireme.RowSet.RowSetFactory;
 import cn.hashdata.bireme.pipeline.PipeLine;
 
 /**
@@ -48,11 +42,6 @@ public class Context {
 
   public LinkedBlockingQueue<Connection> loaderConnections;
   public HashMap<Connection, HashSet<String>> temporaryTables;
-
-  public GenericObjectPool<ChangeSet> idleChangeSets;
-  public GenericObjectPool<RowSet> idleRowSets;
-  public GenericObjectPool<Row> idleRows;
-  public GenericObjectPool<ArrayList<Row>> idleRowArrays;
 
   public ArrayList<PipeLine> pipeLines;
 
@@ -87,26 +76,7 @@ public class Context {
 
     this.server = new StateServer(this, conf.state_server_addr, conf.state_server_port);
 
-    createObjectPool();
     createThreadPool();
-  }
-
-  private void createObjectPool() {
-    GenericObjectPoolConfig config = new GenericObjectPoolConfig();
-    config.setBlockWhenExhausted(false);
-    config.setMaxTotal(-1);
-    config.setMaxIdle(-1);
-    config.setMinIdle(0);
-    config.setMaxWaitMillis(-1);
-
-    config.setJmxNamePrefix("idleChangeSets");
-    idleChangeSets = new GenericObjectPool<ChangeSet>(new ChangeSetFactory(), config);
-    config.setJmxNamePrefix("idleRowSets");
-    idleRowSets = new GenericObjectPool<RowSet>(new RowSetFactory(), config);
-    config.setJmxNamePrefix("idleRows");
-    idleRows = new GenericObjectPool<Row>(new RowFactory(), config);
-    config.setJmxNamePrefix("idleRowArrays");
-    idleRowArrays = new GenericObjectPool<ArrayList<Row>>(new RowArrayFactory(), config);
   }
 
   private void createThreadPool() {
@@ -169,7 +139,16 @@ public class Context {
       }
       scheduleResult.get();
     } catch (ExecutionException e) {
-      throw new BiremeException("Schedule Exception.", e.getCause());
+      if (e.getCause() instanceof InterruptedException) {
+        throw(InterruptedException) e.getCause();
+
+      } else if (e.getCause() instanceof BiremeException) {
+        throw(BiremeException) e.getCause();
+
+      } else {
+        throw new BiremeException("Schedule Exception.", e.getCause());
+      }
+
     } finally {
       server.stop();
       schedule.shutdownNow();

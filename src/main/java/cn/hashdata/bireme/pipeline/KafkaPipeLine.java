@@ -80,7 +80,7 @@ public abstract class KafkaPipeLine extends PipeLine {
     ChangeSet changeSet;
 
     try {
-      changeSet = cxt.idleChangeSets.borrowObject();
+      changeSet = new ChangeSet();
       changeSet.createdAt = new Date();
       changeSet.changes = records;
       changeSet.callback = callback;
@@ -108,15 +108,9 @@ public abstract class KafkaPipeLine extends PipeLine {
 
       for (ConsumerRecord<String, String> change :
           (ConsumerRecords<String, String>) changeSet.changes) {
-        try {
-          row = cxt.idleRows.borrowObject();
-        } catch (Exception e) {
-          String message = "Can't not borrow RowSet from the Object Pool.";
-          throw new BiremeException(message, e);
-        }
+        row = new Row();
 
         if (!transform(change, row)) {
-          cxt.idleRows.returnObject(row);
           continue;
         }
 
@@ -182,6 +176,15 @@ public abstract class KafkaPipeLine extends PipeLine {
 
       stat.newestCompleted = newestRecord;
       stat.delay = new Date().getTime() - start.getTime();
+    }
+
+    @Override
+    public void destory() {
+      super.destory();
+      partitionOffset.clear();
+      partitionOffset = null;
+      timerCTX = null;
+      start = null;
     }
   }
 

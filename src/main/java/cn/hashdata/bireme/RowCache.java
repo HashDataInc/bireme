@@ -114,14 +114,7 @@ public class RowCache {
     }
 
     ArrayList<CommitCallback> callbacks = new ArrayList<CommitCallback>();
-    ArrayList<Row> batch = null;
-
-    try {
-      batch = cxt.idleRowArrays.borrowObject();
-    } catch (Exception e) {
-      String message = "Can't not borrow RowArrays from the Object Pool.\n";
-      throw new BiremeException(message, e);
-    }
+    ArrayList<Row> batch = new ArrayList<Row>();
 
     rows.drainTo(batch);
     commitCallback.drainTo(callbacks);
@@ -211,12 +204,9 @@ public class RowCache {
               task.insert.put(row.keys, row.tuple);
             }
         }
-
-        cxt.idleRows.returnObject(row);
       }
 
-      cxt.idleRowArrays.returnObject(rows);
-
+      rows.clear();
       task.callbacks = callbacks;
 
       return task;
