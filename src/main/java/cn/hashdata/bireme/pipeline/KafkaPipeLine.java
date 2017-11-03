@@ -75,19 +75,12 @@ public abstract class KafkaPipeLine extends PipeLine {
     }
   }
 
-  private ChangeSet packRecords(ConsumerRecords<String, String> records,
-      KafkaCommitCallback callback) throws BiremeException {
-    ChangeSet changeSet;
-
-    try {
-      changeSet = new ChangeSet();
-      changeSet.createdAt = new Date();
-      changeSet.changes = records;
-      changeSet.callback = callback;
-    } catch (Exception e) {
-      String message = "Can't not borrow ChangeSet from the Object Pool.\n";
-      throw new BiremeException(message, e);
-    }
+  private ChangeSet packRecords(
+      ConsumerRecords<String, String> records, KafkaCommitCallback callback) {
+    ChangeSet changeSet = new ChangeSet();
+    changeSet.createdAt = new Date();
+    changeSet.changes = records;
+    changeSet.callback = callback;
 
     return changeSet;
   }

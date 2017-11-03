@@ -38,8 +38,9 @@ public class Dispatcher {
    * Get the transform result and dispatch.
    *
    * @throws BiremeException transform failed
+   * @throws InterruptedException if the current thread was interrupted while waiting
    */
-  public void dispatch() throws BiremeException {
+  public void dispatch() throws BiremeException, InterruptedException {
     if (rowSet != null) {
       complete = insertRowSet();
 
@@ -57,8 +58,6 @@ public class Dispatcher {
           rowSet = head.get();
         } catch (ExecutionException e) {
           throw new BiremeException("Transform failed.\n", e.getCause());
-        } catch (InterruptedException e) {
-          throw new BiremeException("Get Future<RowSet> failed, be interrupted", e);
         }
 
         complete = insertRowSet();

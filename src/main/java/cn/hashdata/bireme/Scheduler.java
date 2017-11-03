@@ -79,7 +79,7 @@ public class Scheduler implements Callable<Long> {
           } catch (ExecutionException e) {
             logger.warn("Pipeline throw out exception. Message {}", e.getMessage());
 
-            throw new BiremeException("Wrap Throwable.", e.getCause());
+            throw new BiremeException("Schedule Exception", e.getCause());
           }
 
           pipeLineQueue.add(complete);

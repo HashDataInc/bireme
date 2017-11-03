@@ -18,6 +18,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.daemon.DaemonController;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import com.codahale.metrics.MetricRegistry;
 
@@ -56,6 +58,8 @@ public class Context {
 
   public StateServer server;
 
+  public Logger logger = LogManager.getLogger("Bireme.Context");
+
   /**
    * Create a new bireme context for test.
    *
@@ -90,7 +94,7 @@ public class Context {
         Executors.newFixedThreadPool(conf.loader_conn_size, new BiremeThreadFactory("Loader"));
   }
 
-  static class WatchDog extends Thread {
+  class WatchDog extends Thread {
     private DaemonController controller;
     private Context cxt;
 
@@ -107,7 +111,10 @@ public class Context {
         cxt.waitForStop();
       } catch (InterruptedException e) {
         controller.fail("Service stopped by user");
-      } catch (Exception e) {
+
+      } catch (BiremeException e) {
+        logger.fatal("Bireme stop abnormally since: {}", e.getMessage());
+        logger.fatal("Stack Trace: ", e);
         controller.fail(e);
       }
     }
@@ -132,22 +139,14 @@ public class Context {
    * @throws InterruptedException if interrupted while waiting
    * @throws BiremeException scheduler throw out Exception
    */
-  public void waitForStop() throws InterruptedException, BiremeException {
+  public void waitForStop() throws BiremeException, InterruptedException {
     try {
       while (!scheduleResult.isDone()) {
         Thread.sleep(1);
       }
       scheduleResult.get();
     } catch (ExecutionException e) {
-      if (e.getCause() instanceof InterruptedException) {
-        throw(InterruptedException) e.getCause();
-
-      } else if (e.getCause() instanceof BiremeException) {
-        throw(BiremeException) e.getCause();
-
-      } else {
-        throw new BiremeException("Schedule Exception.", e.getCause());
-      }
+      throw new BiremeException("Scheduler abnormally stopped.", e.getCause());
 
     } finally {
       server.stop();

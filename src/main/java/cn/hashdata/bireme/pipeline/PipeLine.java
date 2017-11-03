@@ -6,7 +6,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -121,33 +120,35 @@ public abstract class PipeLine implements Callable<PipeLine> {
       logger.error("Stack Trace: ", e);
 
       return this;
+
+    } catch (InterruptedException e) {
+      state = PipeLineState.ERROR;
+      this.e = new BiremeException("Dispatcher failed, be interrupted", e);
+
+      logger.info("Interrupted when getting transform result. Message: {}.", e.getMessage());
+      logger.info("Stack Trace: ", e);
+
+      return this;
     }
 
     // Start merger
     for (RowCache rowCache : cache.values()) {
       if (rowCache.shouldMerge()) {
-        try {
-          rowCache.startMerge();
-        } catch (BiremeException e) {
-          state = PipeLineState.ERROR;
-          this.e = e;
-
-          logger.error("Start merge failed. Message: {}", e.getMessage());
-          logger.error("Stack Trace: ", e);
-
-          return this;
-        }
+        rowCache.startMerge();
       }
+
       try {
         rowCache.startLoad();
-      } catch (ExecutionException e) {
+
+      } catch (BiremeException e) {
         state = PipeLineState.ERROR;
-        this.e = new BiremeException("Loader failed.", e.getCause());
+        this.e = e;
 
         logger.info("Loader for {} failed. Message: {}.", rowCache.tableName, e.getMessage());
         logger.info("Stack Trace: ", e);
 
         return this;
+
       } catch (InterruptedException e) {
         state = PipeLineState.ERROR;
         this.e = new BiremeException("Get Future<Long> failed, be interrupted", e);
@@ -452,21 +453,14 @@ public abstract class PipeLine implements Callable<PipeLine> {
      *
      * @param row the converted change data
      * @param rowSet the {@code RowSet} to organize the {@code Row}
-     * @throws BiremeException Exceptions when add {@code Row} to {@code RowSet}
      */
-    public void addToRowSet(Row row, RowSet rowSet) throws BiremeException {
+    public void addToRowSet(Row row, RowSet rowSet) {
       HashMap<String, ArrayList<Row>> bucket = rowSet.rowBucket;
       String mappedTable = row.mappedTable;
       ArrayList<Row> array = bucket.get(mappedTable);
 
       if (array == null) {
-        try {
-          array = new ArrayList<Row>();
-        } catch (Exception e) {
-          String message = "Can't not borrow RowArray from the Object Pool.";
-          throw new BiremeException(message, e);
-        }
-
+        array = new ArrayList<Row>();
         bucket.put(mappedTable, array);
       }
 

@@ -105,10 +105,8 @@ public class RowCache {
 
   /**
    * Drain current {@code Row} in cache and allocate a {@code RowbatchMerget} to merge.
-   *
-   * @throws BiremeException Exception
    */
-  public void startMerge() throws BiremeException {
+  public void startMerge() {
     if (mergeResult.remainingCapacity() == 0 || rows.isEmpty()) {
       return;
     }
@@ -131,17 +129,21 @@ public class RowCache {
   /**
    * Start {@code ChangeLoader} to work
    *
+   * @throws BiremeException last call to {@code ChangeLoader} throw an Exception.
    * @throws InterruptedException interrupted when get the result of last call to
    *         {@code ChangeLoader}.
-   * @throws ExecutionException last call to {@code ChangeLoader} throw an Exception.
    */
-  public void startLoad() throws InterruptedException, ExecutionException {
+  public void startLoad() throws BiremeException, InterruptedException {
     Future<LoadTask> head = mergeResult.peek();
 
     if (head != null && head.isDone()) {
       // get result of last load
       if (loadResult != null && loadResult.isDone()) {
-        loadResult.get();
+        try {
+          loadResult.get();
+        } catch (ExecutionException e) {
+          throw new BiremeException("Loader failed. ", e.getCause());
+        }
       }
 
       // start a new load

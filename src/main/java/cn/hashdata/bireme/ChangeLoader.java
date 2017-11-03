@@ -116,7 +116,7 @@ public class ChangeLoader implements Callable<Long> {
 
       try {
         executeTask();
-      } catch (InterruptedException | BiremeException e) {
+      } catch (BiremeException e) {
         logger.error("Fail to execute task. Message: {}", e.getMessage());
 
         try {
@@ -141,8 +141,9 @@ public class ChangeLoader implements Callable<Long> {
    *
    * @return a task need be loaded to database
    * @throws BiremeException merge task failed
+   * @throws InterruptedException if the current thread was interrupted while waiting
    */
-  protected LoadTask pollTask() throws BiremeException {
+  protected LoadTask pollTask() throws BiremeException, InterruptedException {
     LoadTask task = null;
     Future<LoadTask> head = taskIn.peek();
 
@@ -153,8 +154,6 @@ public class ChangeLoader implements Callable<Long> {
         task = head.get();
       } catch (ExecutionException e) {
         throw new BiremeException("Merge task failed.\n", e.getCause());
-      } catch (InterruptedException e) {
-        throw new BiremeException("Interrupted when getting merge result.", e);
       }
     }
 
