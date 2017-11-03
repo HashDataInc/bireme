@@ -28,6 +28,8 @@ import cn.hashdata.bireme.RowSet;
  *
  */
 public abstract class KafkaPipeLine extends PipeLine {
+  private final long POLL_TIMEOUT=1000L;
+  
   protected KafkaConsumer<String, String> consumer;
   protected LinkedBlockingQueue<KafkaCommitCallback> commitCallbacks;
 
@@ -40,7 +42,7 @@ public abstract class KafkaPipeLine extends PipeLine {
   @Override
   public ChangeSet pollChangeSet() throws BiremeException {
     // TODO can set parameter as 0L?
-    ConsumerRecords<String, String> records = consumer.poll(1000L);
+    ConsumerRecords<String, String> records = consumer.poll(POLL_TIMEOUT);
 
     if (cxt.stop || records.isEmpty()) {
       return null;

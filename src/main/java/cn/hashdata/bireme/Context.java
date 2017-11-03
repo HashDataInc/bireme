@@ -87,7 +87,7 @@ public class Context {
     pipeLinePool =
         Executors.newFixedThreadPool(conf.pipeline_pool_size, new BiremeThreadFactory("PipeLine"));
     transformerPool = Executors.newFixedThreadPool(
-        conf.transform_pool_size, new BiremeThreadFactory("Dispatcher"));
+        conf.transform_pool_size, new BiremeThreadFactory("Transformer"));
     mergerPool =
         Executors.newFixedThreadPool(conf.merge_pool_size, new BiremeThreadFactory("Merger"));
     loaderPool =

@@ -22,6 +22,7 @@ import cn.hashdata.bireme.pipeline.PipeLine.PipeLineState;
  *
  */
 public class Scheduler implements Callable<Long> {
+  private final long SCHEDULE_SLEEP_TIME=1000L;
   public Logger logger = LogManager.getLogger("Bireme.Scheduler");
 
   public Context cxt;
@@ -71,6 +72,7 @@ public class Scheduler implements Callable<Long> {
           PipeLine complete = null;
 
           if (result == null) {
+            Thread.sleep(SCHEDULE_SLEEP_TIME);
             break;
           }
 
