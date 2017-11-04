@@ -1,6 +1,5 @@
 package cn.hashdata.bireme.pipeline;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 
@@ -101,20 +100,14 @@ public class MaxwellPipeLine extends KafkaPipeLine {
       row.produceTime = record.produceTime;
       row.originTable = getOriginTableName(record);
       row.mappedTable = getMappedTableName(record);
-      row.keys = formatColumns(record, table, table.keyIndexs, false);
+      row.keys = formatColumns(record, table, table.keyNames, false);
 
       if (row.type == RowType.INSERT || row.type == RowType.UPDATE) {
-        ArrayList<Integer> columns = new ArrayList<Integer>();
-
-        for (int i = 0; i < table.ncolumns; ++i) {
-          columns.add(i);
-        }
-
-        row.tuple = formatColumns(record, table, columns, false);
+        row.tuple = formatColumns(record, table, table.columnName, false);
       }
 
       if (row.type == RowType.UPDATE) {
-        row.oldKeys = formatColumns(record, table, table.keyIndexs, true);
+        row.oldKeys = formatColumns(record, table, table.keyNames, true);
 
         if (row.keys.equals(row.oldKeys)) {
           row.oldKeys = null;

@@ -5,7 +5,6 @@ import java.math.BigInteger;
 import java.sql.Types;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -92,16 +91,10 @@ public class DebeziumPipeLine extends KafkaPipeLine {
       row.produceTime = record.produceTime;
       row.originTable = getOriginTableName(record);
       row.mappedTable = getMappedTableName(record);
-      row.keys = formatColumns(record, table, table.keyIndexs, false);
+      row.keys = formatColumns(record, table, table.keyNames, false);
 
       if (row.type != RowType.DELETE) {
-        ArrayList<Integer> columns = new ArrayList<Integer>();
-
-        for (int i = 0; i < table.ncolumns; ++i) {
-          columns.add(i);
-        }
-
-        row.tuple = formatColumns(record, table, columns, false);
+        row.tuple = formatColumns(record, table, table.columnName, false);
       }
 
       return true;

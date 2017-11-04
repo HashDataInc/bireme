@@ -28,8 +28,8 @@ import cn.hashdata.bireme.RowSet;
  *
  */
 public abstract class KafkaPipeLine extends PipeLine {
-  private final long POLL_TIMEOUT=1000L;
-  
+  private final long POLL_TIMEOUT = 100L;
+
   protected KafkaConsumer<String, String> consumer;
   protected LinkedBlockingQueue<KafkaCommitCallback> commitCallbacks;
 

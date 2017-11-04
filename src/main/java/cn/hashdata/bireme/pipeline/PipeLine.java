@@ -252,14 +252,13 @@ public abstract class PipeLine implements Callable<PipeLine> {
      * @return the csv tuple in string
      * @throws BiremeException when can not get the field value
      */
-    protected String formatColumns(Record record, Table table, ArrayList<Integer> columns,
+    protected String formatColumns(Record record, Table table, ArrayList<String> columns,
         boolean oldValue) throws BiremeException {
       tupleStringBuilder.setLength(0);
 
       for (int i = 0; i < columns.size(); ++i) {
-        int columnIndex = columns.get(i);
-        int sqlType = table.columnType.get(columnIndex);
-        String columnName = table.columnName.get(columnIndex);
+        String columnName = columns.get(i);
+        int sqlType = table.columnType.get(columnName);
         String data = null;
 
         data = record.getField(columnName, oldValue);
@@ -291,7 +290,7 @@ public abstract class PipeLine implements Callable<PipeLine> {
             }
 
             case Types.BIT: {
-              int precision = table.columnPrecision.get(columnIndex);
+              int precision = table.columnPrecision.get(columnName);
               tupleStringBuilder.append(decodeToBit(data, precision));
               break;
             }
@@ -299,7 +298,7 @@ public abstract class PipeLine implements Callable<PipeLine> {
             case Types.DATE:
             case Types.TIME:
             case Types.TIMESTAMP: {
-              int scale = table.columnScale.get(columnIndex);
+              int scale = table.columnScale.get(columnName);
               String time = decodeToTime(data, sqlType, scale);
               tupleStringBuilder.append(time);
               break;
@@ -307,7 +306,7 @@ public abstract class PipeLine implements Callable<PipeLine> {
 
             case Types.DECIMAL:
             case Types.NUMERIC: {
-              int scale = table.columnScale.get(columnIndex);
+              int scale = table.columnScale.get(columnName);
               String numeric = decodeToNumeric(data, sqlType, scale);
               tupleStringBuilder.append(numeric);
               break;

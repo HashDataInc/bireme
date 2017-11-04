@@ -11,6 +11,7 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * {@code Table} stores table's metadata acquired from database. Metadata includes:
@@ -28,20 +29,18 @@ import java.util.ArrayList;
 public class Table {
   public int ncolumns;
   public ArrayList<String> columnName;
-  public ArrayList<Integer> columnType;
-  public ArrayList<Integer> columnPrecision;
-  public ArrayList<Integer> columnScale;
   public ArrayList<String> keyNames;
-  public ArrayList<Integer> keyIndexs; // PRI
+  public HashMap<String, Integer> columnType;
+  public HashMap<String, Integer> columnPrecision;
+  public HashMap<String, Integer> columnScale;
 
   public Table() {
     this.ncolumns = 0;
     this.columnName = new ArrayList<String>();
-    this.columnType = new ArrayList<Integer>();
-    this.columnPrecision = new ArrayList<Integer>();
-    this.columnScale = new ArrayList<Integer>();
     this.keyNames = new ArrayList<String>();
-    this.keyIndexs = new ArrayList<Integer>();
+    this.columnType = new HashMap<String, Integer>();
+    this.columnPrecision = new HashMap<String, Integer>();
+    this.columnScale = new HashMap<String, Integer>();
   }
 
   /**
@@ -55,11 +54,10 @@ public class Table {
   public Table(String schema, String table, Connection conn) throws BiremeException {
     this.ncolumns = 0;
     this.columnName = new ArrayList<String>();
-    this.columnType = new ArrayList<Integer>();
-    this.columnPrecision = new ArrayList<Integer>();
-    this.columnScale = new ArrayList<Integer>();
     this.keyNames = new ArrayList<String>();
-    this.keyIndexs = new ArrayList<Integer>();
+    this.columnType = new HashMap<String, Integer>();
+    this.columnPrecision = new HashMap<String, Integer>();
+    this.columnScale = new HashMap<String, Integer>();
 
     Statement statement = null;
     ResultSet rs = null;
@@ -77,10 +75,9 @@ public class Table {
 
       rs = dbMetaData.getPrimaryKeys("", schema, table);
       while (rs.next()) {
-        this.keyIndexs.add(rs.getInt("KEY_SEQ") - 1);
         this.keyNames.add(rs.getString("COLUMN_NAME"));
       }
-      if (this.keyIndexs.size() == 0) {
+      if (this.keyNames.size() == 0) {
         String message = "Table " + schema + "." + table + " has no primary key.";
         throw new BiremeException(message);
       }
@@ -92,10 +89,11 @@ public class Table {
       this.ncolumns = rsMetaData.getColumnCount();
 
       for (int i = 0, len = rsMetaData.getColumnCount(); i < len; i++) {
-        this.columnName.add(rsMetaData.getColumnName(i + 1));
-        this.columnType.add(rsMetaData.getColumnType(i + 1));
-        this.columnPrecision.add(rsMetaData.getPrecision(i + 1));
-        this.columnScale.add(rsMetaData.getScale(i + 1));
+        String name = rsMetaData.getColumnName(i + 1);
+        this.columnName.add(name);
+        this.columnType.put(name, rsMetaData.getColumnType(i + 1));
+        this.columnPrecision.put(name, rsMetaData.getPrecision(i + 1));
+        this.columnScale.put(name, rsMetaData.getScale(i + 1));
       }
     } catch (SQLException e) {
       try {
