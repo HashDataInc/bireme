@@ -47,6 +47,8 @@ Debezium + Kafka is another data source type that bireme currently supports. The
 
 Bireme reads records from the data source, delivers them into separate pipelines. In each pipeline, bireme converts them into internal format and caches them. When the cached records reaches a certain amount, they are merged into a task. Each task contains two collections, *delete*  collection and *insert* collection. It finally updates the records to the target database.
 
+Each data source may have several pipelines. For maxwell, each Kafka partition corresponds to a pipeline and for debezium, each Kafka topic corresponds to a pipeline.
+
 ![bireme](docs/bireme.png)
 
 The following picture depicts how change data is processed in a pipeline.
@@ -136,16 +138,18 @@ The following is an example of Load State:
 
 ```
 {
-  "source_name": "debezium_CI",
+  "source_name": "XXX",
+  "type": "XXX"
   "pipelines": [
     {
-      "name": "Debezium-debezium_CI-debezium_CI.public.charsource",
-      "newest_record": "yyyy-MM-ddTHH:mm:ss.SSSZ",
+      "name": "XXXXXX",
+      "latest": "yyyy-MM-ddTHH:mm:ss.SSSZ",
       "delay": XX.XXX
     },
     {
-      "name": "Debezium-debezium_CI-debezium_CI.public.binarysource",
-      "newest_record": "yyyy-MM-ddTHH:mm:ss.SSSZ",
+      "name": "XXXXXX",
+      "latest": "yyyy-MM-ddTHH:mm:ss.SSSZ",
+
       "delay": XX.XXX
     },
   ]
@@ -153,9 +157,10 @@ The following is an example of Load State:
 ```
 
 * *source_name* is the name of queried data source, as designated in the configuration file.
+* *type* is the type of data source.
 * *pipelines* is an array, every element in which corresponds to a pipeline. (Every data source may have several separate pipelines.)
  - *name* is the pipeline's name.
- - *newest_record* is produce time of latest change data that have been successfully loaded to hashdata.
+ - *latest* is produce time of latest change data that have been successfully loaded to hashdata.
  - *delay* is the time period for change data from entering bireme to being committed to data source.
 
 ## 1.6 Reference

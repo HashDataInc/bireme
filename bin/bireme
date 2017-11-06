@@ -42,6 +42,14 @@ LOG_GC="${TOPDIR}/logs/$NAME.gc"
 # up the JVM to accept JMX remote management:
 # http://java.sun.com/javase/6/docs/technotes/guides/management/agent.html
 # by default we allow local JMX connections
+
+println() {
+  if [ "$CMD" = "start" ]
+  then
+    echo "$1" >&2
+  fi
+}
+
 if [ -z "$JXM_LOCALONLY" ]
 then
     JXM_LOCALONLY=false
@@ -49,7 +57,7 @@ fi
 
 if [ -z "$JMX_DISABLE" ] || [ "$JMX_DISABLE" = 'false' ]
 then
-  echo "Bireme JMX enabled by default" >&2
+  println "Bireme JMX enabled by default" >&2
   if [ -z "$JMX_PORT" ]
   then
     JMX="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.local.only=$JXM_LOCALONLY"
@@ -66,19 +74,19 @@ then
     then
       JMX_LOG4J=true
     fi
-    echo "Bireme remote JMX Port set to $JMX_PORT" >&2
-    echo "Bireme remote JMX authenticate set to $JMX_AUTH" >&2
-    echo "Bireme remote JMX ssl set to $JMX_SSL" >&2
-    echo "Bireme remote JMX log4j set to $JMX_LOG4J" >&2
+    println "Bireme remote JMX Port set to $JMX_PORT" >&2
+    println "Bireme remote JMX authenticate set to $JMX_AUTH" >&2
+    println "Bireme remote JMX ssl set to $JMX_SSL" >&2
+    println "Bireme remote JMX log4j set to $JMX_LOG4J" >&2
     JMX="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$JMX_PORT -Dcom.sun.management.jmxremote.authenticate=$JMX_AUTH -Dcom.sun.management.jmxremote.ssl=$JMX_SSL -Dzookeeper.jmx.log4j.disable=$JMX_LOG4J"
   fi
 else
-    echo "JMX disabled by user request" >&2
+    println "JMX disabled by user request" >&2
 fi
 
 if [ "$MAX_HEAP" ]
 then
-  echo "Bireme maximum heap size is ${MAX_HEAP}m" >&2
+  println "Bireme maximum heap size is ${MAX_HEAP}m" >&2
   HEAP="-Xmx${MAX_HEAP}m"
 fi
 

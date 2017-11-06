@@ -4,30 +4,15 @@ DOCKER_RUN='docker run -it'
 DOCKER_EXEC='docker exec -it'
 MYSQL_EXEC=$DOCKER_EXEC' MySQL mysql -uroot -p123456'
 
-if [ -z "$WAREHOUSES" ]
-then
-    WAREHOUSES=5
-fi
+WAREHOUSES=${WAREHOUSES:-5}
 
-if [ -z "$CONNECTIONS" ]
-then
-    CONNECTIONS=5
-fi
+CONNECTIONS=${CONNECTIONS:-5}
 
-if [ -z "$WARMUP_TIME" ]
-then
-    WARMUP_TIME=60
-fi
+WARMUP_TIME=${WARMUP_TIME:-60}
 
-if [ -z "$BENCHMARK_TIME" ]
-then
-    BENCHMARK_TIME=1800
-fi
+BENCHMARK_TIME=${BENCHMARK_TIME:-1800}
 
-if [ -z "$MYSQL_VOLUME" ]
-then
-    MYSQL_VOLUME=/var/lib/mysql
-fi
+MYSQL_VOLUME=${MYSQL_VOLUME:-/var/lib/mysql}
 
 if [ -z "$KAFKA_SERVER" ]
 then
