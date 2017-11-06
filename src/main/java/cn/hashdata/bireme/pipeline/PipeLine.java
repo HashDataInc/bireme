@@ -1,111 +1,209 @@
-/**
- * Copyright HashData. All Rights Reserved.
- */
-
-package cn.hashdata.bireme;
+package cn.hashdata.bireme.pipeline;
 
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.codahale.metrics.Meter;
-import com.codahale.metrics.MetricRegistry;
-
-import cn.hashdata.bireme.provider.ProviderConfig;
+import cn.hashdata.bireme.BiremeException;
+import cn.hashdata.bireme.ChangeSet;
+import cn.hashdata.bireme.Context;
+import cn.hashdata.bireme.Dispatcher;
+import cn.hashdata.bireme.PipeLineStat;
+import cn.hashdata.bireme.Record;
+import cn.hashdata.bireme.Row;
+import cn.hashdata.bireme.RowCache;
+import cn.hashdata.bireme.RowSet;
+import cn.hashdata.bireme.Table;
 
 /**
- * {@code Provider} is responsible for polling data from data source and provide to
- * {@code Dispatcher}. Each {@code Provider} must its own {@code Transformer}, which could transform
- * the polled data to bireme inner format.
+ * {@code PipeLine} is a bridge between data source and target table. The data flow order is
+ * guaranteed. A {@code PipeLine} does four things as follows:
+ * <ul>
+ * <li>Poll data and allocate {@link Transformer} to convert the data.</li>
+ * <li>Dispatch the transformed data and insert it into {@link RowCache}.</li>
+ * <li>Drive the {@code RowBatchMerger} to work</li>
+ * <li>Drivet the {@code ChangeLoader} to work</li>
+ * </ul>
  *
  * @author yuze
  *
  */
-public abstract class Provider implements Callable<Long> {
-  protected static final Long TIMEOUT_MS = 1000L;
+public abstract class PipeLine implements Callable<PipeLine> {
+  public enum PipeLineState { NORMAL, ERROR, STOP }
 
-  protected Logger logger;
-  protected Meter recordMeter;
+  public Logger logger;
 
-  protected Context cxt;
-  protected ProviderConfig conf;
-  protected HashMap<String, String> tableMap;
-  protected LinkedBlockingQueue<ChangeSet> changeSetOut;
-  protected LinkedBlockingQueue<Transformer> idleTransformer;
+  public String myName;
+  public volatile PipeLineState state;
+  public BiremeException e;
+  public PipeLineStat stat;
 
-  public Provider(Context cxt, ProviderConfig conf) {
+  public Context cxt;
+  public SourceConfig conf;
+
+  public LinkedBlockingQueue<Future<RowSet>> transResult;
+  private LinkedList<Transformer> localTransformer;
+
+  private Dispatcher dispatcher;
+
+  public ConcurrentHashMap<String, RowCache> cache;
+
+  public PipeLine(Context cxt, SourceConfig conf, String myName) {
+    this.myName = myName;
+    this.state = PipeLineState.NORMAL;
+    this.e = null;
+
     this.cxt = cxt;
     this.conf = conf;
-    this.tableMap = cxt.tableMap;
-    this.changeSetOut = cxt.changeSetQueue;
-    this.idleTransformer = new LinkedBlockingQueue<Transformer>();
 
-    this.logger = LogManager.getLogger("Bireme." + Provider.class + " " + getProviderName());
-    this.recordMeter = cxt.metrics.meter(MetricRegistry.name(Provider.class, getProviderName()));
+    int queueSize = cxt.conf.transform_queue_size;
+
+    transResult = new LinkedBlockingQueue<Future<RowSet>>(queueSize);
+    localTransformer = new LinkedList<Transformer>();
+
+    cache = new ConcurrentHashMap<String, RowCache>();
+
+    dispatcher = new Dispatcher(cxt, this);
+
+    for (int i = 0; i < queueSize; i++) {
+      localTransformer.add(createTransformer());
+    }
+
+    // initialize statistics
+    this.stat = new PipeLineStat(this);
+  }
+
+  @Override
+  public PipeLine call() {
+    // Poll data and start transformer
+    while (transResult.remainingCapacity() != 0) {
+      ChangeSet changeSet = null;
+
+      try {
+        changeSet = pollChangeSet();
+      } catch (BiremeException e) {
+        state = PipeLineState.ERROR;
+        this.e = e;
+
+        logger.error("Poll change set failed. Message: {}", e.getMessage());
+        logger.error("Stack Trace: ", e);
+
+        return this;
+      }
+
+      if (changeSet == null) {
+        break;
+      }
+
+      Transformer trans = localTransformer.remove();
+      trans.setChangeSet(changeSet);
+      startTransform(trans);
+      localTransformer.add(trans);
+    }
+
+    // Start dispatcher, only one dispatcher for each pipeline
+    try {
+      dispatcher.dispatch();
+    } catch (BiremeException e) {
+      state = PipeLineState.ERROR;
+      this.e = e;
+
+      logger.error("Dispatch failed. Message: {}", e.getMessage());
+      logger.error("Stack Trace: ", e);
+
+      return this;
+
+    } catch (InterruptedException e) {
+      state = PipeLineState.ERROR;
+      this.e = new BiremeException("Dispatcher failed, be interrupted", e);
+
+      logger.info("Interrupted when getting transform result. Message: {}.", e.getMessage());
+      logger.info("Stack Trace: ", e);
+
+      return this;
+    }
+
+    // Start merger
+    for (RowCache rowCache : cache.values()) {
+      if (rowCache.shouldMerge()) {
+        rowCache.startMerge();
+      }
+
+      try {
+        rowCache.startLoad();
+
+      } catch (BiremeException e) {
+        state = PipeLineState.ERROR;
+        this.e = e;
+
+        logger.info("Loader for {} failed. Message: {}.", rowCache.tableName, e.getMessage());
+        logger.info("Stack Trace: ", e);
+
+        return this;
+
+      } catch (InterruptedException e) {
+        state = PipeLineState.ERROR;
+        this.e = new BiremeException("Get Future<Long> failed, be interrupted", e);
+
+        logger.info("Interrupted when getting loader result for {}. Message: {}.",
+            rowCache.tableName, e.getMessage());
+        logger.info("Stack Trace: ", e);
+
+        return this;
+      }
+    }
+
+    // Commit result
+    checkAndCommit();
+    return this;
   }
 
   /**
-   * Get the type of the provider.
+   * Poll a set of change data from source and pack it to {@link ChangeSet}.
    *
-   * @return the type of the provider
+   * @return a packed change set
+   * @throws BiremeException Exceptions when poll data from source
    */
-  public String getProviderType() {
-    return conf.type.toString();
+  public abstract ChangeSet pollChangeSet() throws BiremeException;
+
+  /**
+   * Check whether the loading operation is complete. If true, commit it.
+   *
+   */
+  public abstract void checkAndCommit();
+
+  /**
+   * Create a new {@link Transformer} to work parallel.
+   *
+   * @return a new {@code Transformer}
+   */
+  public abstract Transformer createTransformer();
+
+  private void startTransform(Transformer trans) {
+    ExecutorService transformerPool = cxt.transformerPool;
+    Future<RowSet> result = transformerPool.submit(trans);
+    transResult.add(result);
   }
 
   /**
-   * Get the unique name for the provider, which is specified in the configuration file.
+   * Get the unique name for the {@code PipeLine}.
    *
-   * @return the name for the provider
+   * @return the name for the {@code PipeLine}
    */
-  public String getProviderName() {
+  public String getPipeLineName() {
     return conf.name;
   }
 
   /**
-   * Create a new transformer corresponding to the provider.
-   *
-   * @return the new created transformer
-   */
-  abstract public Transformer createTransformer();
-
-  /**
-   * Borrow a {@code Transformer} from the {@code Provider} and set the {@code ChangeSet} to be
-   * transformer. This method should be non-blocking. If no {@code Transformer} is available
-   * currently, create a new {@code Transformer}.
-   *
-   * @param changeSet The {@code ChangeSet} that need to be transformed.
-   * @return The borrowed {@code Transformer}.
-   */
-  public Transformer borrowTransformer(ChangeSet changeSet) {
-    Transformer transformer = idleTransformer.poll();
-
-    if (transformer == null) {
-      transformer = createTransformer();
-    }
-
-    transformer.setChangeSet(changeSet);
-
-    return transformer;
-  };
-
-  /**
-   * Return the borrowed {@code Transformer} to the pool.
-   *
-   * @param trans The {@code Transformer} should be returned.
-   */
-  public void returnTransformer(Transformer trans) {
-    trans.setChangeSet(null);
-    idleTransformer.offer(trans);
-  }
-
-  /**
-   * {@code Transformer} convert a group of change data to unified form.
+   * {@code Transformer} convert a group of change data to unified form {@link Row}.
    *
    * @author yuze
    *
@@ -133,18 +231,12 @@ public abstract class Provider implements Callable<Long> {
      */
     @Override
     public RowSet call() throws BiremeException {
-      RowSet rowSet = null;
-
-      try {
-        rowSet = cxt.idleRowSets.borrowObject();
-      } catch (Exception e) {
-        String message = "Can't not borrow RowSet from the Object Pool.";
-        throw new BiremeException(message, e);
-      }
+      RowSet rowSet = new RowSet();
 
       fillRowSet(rowSet);
 
-      cxt.idleChangeSets.returnObject(changeSet);
+      changeSet.destory();
+      changeSet = null;
 
       return rowSet;
     }
@@ -160,14 +252,13 @@ public abstract class Provider implements Callable<Long> {
      * @return the csv tuple in string
      * @throws BiremeException when can not get the field value
      */
-    protected String formatColumns(Record record, Table table, ArrayList<Integer> columns,
+    protected String formatColumns(Record record, Table table, ArrayList<String> columns,
         boolean oldValue) throws BiremeException {
       tupleStringBuilder.setLength(0);
 
       for (int i = 0; i < columns.size(); ++i) {
-        int columnIndex = columns.get(i);
-        int sqlType = table.columnType.get(columnIndex);
-        String columnName = table.columnName.get(columnIndex);
+        String columnName = columns.get(i);
+        int sqlType = table.columnType.get(columnName);
         String data = null;
 
         data = record.getField(columnName, oldValue);
@@ -199,7 +290,7 @@ public abstract class Provider implements Callable<Long> {
             }
 
             case Types.BIT: {
-              int precision = table.columnPrecision.get(columnIndex);
+              int precision = table.columnPrecision.get(columnName);
               tupleStringBuilder.append(decodeToBit(data, precision));
               break;
             }
@@ -207,7 +298,7 @@ public abstract class Provider implements Callable<Long> {
             case Types.DATE:
             case Types.TIME:
             case Types.TIMESTAMP: {
-              int scale = table.columnScale.get(columnIndex);
+              int scale = table.columnScale.get(columnName);
               String time = decodeToTime(data, sqlType, scale);
               tupleStringBuilder.append(time);
               break;
@@ -215,7 +306,7 @@ public abstract class Provider implements Callable<Long> {
 
             case Types.DECIMAL:
             case Types.NUMERIC: {
-              int scale = table.columnScale.get(columnIndex);
+              int scale = table.columnScale.get(columnName);
               String numeric = decodeToNumeric(data, sqlType, scale);
               tupleStringBuilder.append(numeric);
               break;
@@ -357,34 +448,18 @@ public abstract class Provider implements Callable<Long> {
     public abstract void fillRowSet(RowSet rowSet) throws BiremeException;
 
     /**
-     * Get the outer {@code Provider} of this {@code Transformer}.
-     *
-     * @return the outer {@code Provider}
-     */
-    public Provider getProvider() {
-      return Provider.this;
-    }
-
-    /**
      * After convert a single change data to a {@code Row}, insert into the {@code RowSet}.
      *
      * @param row the converted change data
      * @param rowSet the {@code RowSet} to organize the {@code Row}
-     * @throws BiremeException Exceptions when add {@code Row} to {@code RowSet}
      */
-    public void addToRowSet(Row row, RowSet rowSet) throws BiremeException {
+    public void addToRowSet(Row row, RowSet rowSet) {
       HashMap<String, ArrayList<Row>> bucket = rowSet.rowBucket;
       String mappedTable = row.mappedTable;
       ArrayList<Row> array = bucket.get(mappedTable);
 
       if (array == null) {
-        try {
-          array = cxt.idleRowArrays.borrowObject();
-        } catch (Exception e) {
-          String message = "Can't not borrow RowArray from the Object Pool.";
-          throw new BiremeException(message, e);
-        }
-
+        array = new ArrayList<Row>();
         bucket.put(mappedTable, array);
       }
 

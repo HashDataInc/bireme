@@ -1,10 +1,10 @@
+import hashlib
 import MySQLdb
 import psycopg2
 import binascii
 import re
-from cStringIO import StringIO
 
-def sqldump(dbtype, host, port, user, passwd, db, table, *key):
+def sqlCheckSum(dbtype, host, port, user, passwd, db, table, *key):
     try:
         connection = getConnection(dbtype, host, port, user, passwd, db)
         dbhandler = connection.cursor()
@@ -21,9 +21,9 @@ def sqldump(dbtype, host, port, user, passwd, db, table, *key):
         dbhandler.execute("SELECT " + ", ".join(names) + " FROM " + table + " order by " + ", ".join(key))
         
         if dbtype.lower() == "mysql":
-            return mysqlDump(dbhandler, types)
+            return mysqlCheckSum(dbhandler, types)
         elif dbtype.lower() == "postgres":
-            return pgDump(dbhandler, types)
+            return pgCheckSum(dbhandler, types)
 
     except Exception as e:
         print e
@@ -40,31 +40,30 @@ def getNameAndType(dbhandler, dbtype, table):
     dbhandler.execute("SELECT column_name, data_type FROM information_schema.columns WHERE table_name='" + table + "' ORDER BY column_name")
     return [line for line in dbhandler.fetchall()]
 
-def mysqlDump(dbhandler, types):
+def mysqlCheckSum(dbhandler, types):
     length = range(0, len(types))
-    fileStr = StringIO()
+    checksum = hashlib.md5()
 
     while True:
         line = dbhandler.fetchone()
         if not line:
             break;
-
+ 
         for i in length:
             if line[i] is None:
-                fileStr.write(str(line[i]) + "\t")
+                checksum.update(str(line[i]) + "\t")
             elif re.search("binary.*|bit.*|blob.*", types[i]):
-                fileStr.write(str(binascii.hexlify(line[i])) + "\t")
+                checksum.update(str(binascii.hexlify(line[i])) + "\t")
             elif re.search("decimal", types[i]):
-                fileStr.write(str(line[i].normalize()) + "\t")
+                checksum.update(str(line[i].normalize()) + "\t")
             else:
-                fileStr.write(str(line[i]) + "\t")
-        fileStr.write("\n")
+                checksum.update(str(line[i]) + "\t")
 
-    return fileStr.getvalue()
+    return checksum.hexdigest()
 
-def pgDump(dbhandler, types):
+def pgCheckSum(dbhandler, types):
     length = range(0, len(types))
-    fileStr = StringIO()
+    checksum = hashlib.md5()
 
     while True:
         line = dbhandler.fetchone()
@@ -73,17 +72,16 @@ def pgDump(dbhandler, types):
 
         for i in length:
             if line[i] is None:
-                fileStr.write(str(line[i]) + "\t")
+                checksum.update(str(line[i]) + "\t")
             elif re.search("bytea", types[i]):
-                fileStr.write(str(binascii.hexlify(line[i])) + "\t")
+                checksum.update(str(binascii.hexlify(line[i])) + "\t")
             elif re.search("bit", types[i]):
-                fileStr.write(str(hex(int(line[i], 2))[2:]) + "\t")
+                checksum.update(str(hex(int(line[i], 2))[2:]) + "\t")
             elif re.search("boolean", types[i]):
-                fileStr.write("1\t" if line[i] else "0\t")
+                checksum.update("1\t" if line[i] else "0\t")
             elif re.search("numeric", types[i]):
-                fileStr.write(str(line[i].normalize()) + "\t")
+                checksum.update(str(line[i].normalize()) + "\t")
             else:
-                fileStr.write(str(line[i]) + "\t")
-        fileStr.write("\n")
+                checksum.update(str(line[i]) + "\t")
 
-    return fileStr.getvalue()
+    return checksum.hexdigest()

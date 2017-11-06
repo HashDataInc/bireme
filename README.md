@@ -45,9 +45,13 @@ Debezium + Kafka is another data source type that bireme currently supports. The
 
 ## 1.3 How does bireme work
 
-Bireme reads records from the data source, converts them into internal format and caches them. When the cached records reaches a certain amount, they are merged into a task. Each task contains two collections, *delete*  collection and *insert* collection. It finally updates the records to the target database.
+Bireme reads records from the data source, delivers them into separate pipelines. In each pipeline, bireme converts them into internal format and caches them. When the cached records reaches a certain amount, they are merged into a task. Each task contains two collections, *delete*  collection and *insert* collection. It finally updates the records to the target database.
 
 ![bireme](docs/bireme.png)
+
+The following picture depicts how change data is processed in a pipeline.
+
+![pipeline](docs/pipeline.png)
 
 ## 1.4 Introduction to configuration files
 
@@ -76,25 +80,28 @@ The configuration files consist of two parts:
 |:---:|:---:|
 |\<source_name\>.kafka.server|Kafka address. Format:<br>\<ip\>:\<port\>|
 |\<source_name\>.kafka.topic|Corresponding topic of data source|
+|\<source_name\>.kafka.groupid|Kafka consumer group id. Default value is *bireme*|
 
 **Parameters for Debezium data source**
 
 |Parameters|Description|
 |:---:|:---:|
 |\<source_name\>.kafka.server|Kafka address. Format:<br>\<ip\>:\<port\>|
+|\<source_name\>.kafka.groupid|Kafka consumer group id. Default value is *bireme*|
 
 **Other parameters**
 
 |Parameters|Description|Default|
 |:---:|:---:|:---:|
-|metrics.reporter|Bireme specifies two monitoring modes, consolo or jmx. If you do not need to monitor, you can specify this as none|console|
-|metrics.reporter.console.interval|Time interval between metrics output in seconds. It is valid as long as metrics.reporter is console|10|
-|loader.conn_pool.size|Number of connections to target database, which is less or equal to the number of Change Loaders|10|
-|loader.task_queue.size|The length of task queue in each Change Loader|2|
-|transform.pool.size|Thread pool size for Transform|10|
-|merge.pool.size|Thread pool size for Merge|10|
+|pipeline.thread_pool.size|Thread pool size for Pipeline|5|
+|transform.thread_pool.size|Thread pool size for Transform|10|
+|merge.thread_pool.size|Thread pool size for Merge|10|
 |merge.interval|Maxmium interval between Merge in milliseconds|10000|
 |merge.batch.size|Maxmium number of Row in one Merge|50000|
+|loader.conn_pool.size|Number of connections to target database, which is less or equal to the number of Change Loaders|10|
+|loader.task_queue.size|The length of task queue in each Change Loader|2|
+|metrics.reporter|Bireme specifies two monitoring modes, consolo or jmx. If you do not need to monitor, you can specify this as none|jmx|
+|metrics.reporter.console.interval|Time interval between metrics output in seconds. It is valid as long as metrics.reporter is console|10|
 |state.server.port|Port for state server|8080|
 |state.server.addr|IP address for state server|0.0.0.0|
 
@@ -110,18 +117,6 @@ In the configuration file for each data source, specify the table which the data
 
 ## 1.5 Monitoring
 
-**Load State**
-
-Bireme load a batch of change data at a time, which is called a task. For each task, bireme represents its state by Load State. The Load State of recently successfully loaded task is used to describe the state of corresponding target table.
-
-Three kinds of time is used to describe a Load State.
-
-|Time|Description|
-|:---:|:---:|
-|produce time|For a record, produce time is when it is produced to Kafka. Bireme record this time for the rocord which is the newest produced one in a task.|
-|receive time|For a record, receive time is when it is consumed from Kafka. Bireme record this time for the record which is the earliest received one in a task. We do so to monitor the longest time for a record from entering bireme to being successfully loaded.|
-|complete time|When the task is successfully loaded into target table.|
-
 **HTTP Server**
 
 Bireme starts a light HTTP server for acquiring current Load State.
@@ -130,8 +125,8 @@ When the HTTP server is started the following endpoints are exposed:
 
 |Endpoint|Description|
 |:---:|:---:|
-|/|Get the Load State for all target table in the target database.|
-|/\<target table\>|Get the Load State for the given target table.|
+|/|Get the load state for all data source.|
+|/\<data source\>|Get the load state for the given data source.|
 
 The result is organized in JSON format. Using parameter *pretty* will print the user-friendly result.
 
@@ -141,26 +136,27 @@ The following is an example of Load State:
 
 ```
 {
-  "target_table": "public.chartarget",
-  "sources": [
+  "source_name": "debezium_CI",
+  "pipelines": [
     {
-      "source": "debezium_CI",
-      "table_name": "public.charsource",
-      "produce_time": "2017-10-12T16:27:40.812Z",
-      "receive_time": "2017-10-12T16:30:10.160Z"
-    }
-  ],
-  "complete_time": "2017-10-12T16:30:20.009Z"
+      "name": "Debezium-debezium_CI-debezium_CI.public.charsource",
+      "newest_record": "yyyy-MM-ddTHH:mm:ss.SSSZ",
+      "delay": XX.XXX
+    },
+    {
+      "name": "Debezium-debezium_CI-debezium_CI.public.binarysource",
+      "newest_record": "yyyy-MM-ddTHH:mm:ss.SSSZ",
+      "delay": XX.XXX
+    },
+  ]
 }
 ```
 
-* *target_table* is the target table name in the target database.
-* *sources* is an array, every element in which corresponds to a data souce. (Each target table may receive data from several data souces. Although in the example we have only one source.)
- - *source* is the source name.
- - *table_name* is the table name in source.
- - *produce_time* see the definition above.
- - *receive_time* see the definition above.
-* *complete_time* see the definition above.
+* *source_name* is the name of queried data source, as designated in the configuration file.
+* *pipelines* is an array, every element in which corresponds to a pipeline. (Every data source may have several separate pipelines.)
+ - *name* is the pipeline's name.
+ - *newest_record* is produce time of latest change data that have been successfully loaded to hashdata.
+ - *delay* is the time period for change data from entering bireme to being committed to data source.
 
 ## 1.6 Reference
 

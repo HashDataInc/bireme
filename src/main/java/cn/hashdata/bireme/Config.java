@@ -5,7 +5,6 @@
 package cn.hashdata.bireme;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 
@@ -17,8 +16,8 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import cn.hashdata.bireme.provider.KafkaProvider.KafkaProviderConfig;
-import cn.hashdata.bireme.provider.ProviderConfig.SourceType;
+import cn.hashdata.bireme.pipeline.SourceConfig;
+import cn.hashdata.bireme.pipeline.SourceConfig.SourceType;
 
 /**
  * Configurations about bireme.
@@ -31,30 +30,33 @@ public class Config {
 
   private Logger logger = LogManager.getLogger("Bireme." + Config.class);
 
-  protected Configuration config;
+  private Configuration config;
 
-  public String reporter;
-  public int changeset_queue_size;
+  public int pipeline_pool_size;
+
   public int transform_pool_size;
-  public int trans_result_queue_size;
+  public int transform_queue_size;
+
   public int row_cache_size;
+
   public int merge_pool_size;
   public int merge_interval;
   public int batch_size;
+
   public int loader_conn_size;
   public int loader_task_queue_size;
+  public int loadersCount;
+
+  public String reporter;
   public int report_interval;
+
   public String state_server_addr;
   public int state_server_port;
 
-  public ConnectionConfig target;
+  public ConnectionConfig targetDatabase;
 
-  public ArrayList<String> dataSource;
-  public ArrayList<String> dataSourceType;
-  public ArrayList<KafkaProviderConfig> maxwellConf;
-  public ArrayList<KafkaProviderConfig> debeziumConf;
+  public HashMap<String, SourceConfig> sourceConfig;
   public HashMap<String, String> tableMap;
-  public int loadersCount;
 
   public static class ConnectionConfig {
     public String jdbcUrl;
@@ -79,22 +81,17 @@ public class Config {
     config = configs.properties(new File(configFile));
 
     basicConfig();
-    connectionConfig();
+    connectionConfig("target");
     dataSourceConfig();
 
     logConfig();
   }
 
   protected void basicConfig() {
-    reporter = config.getString("metrics.reporter", "console");
-    report_interval = config.getInt("metrics.reporter.console.interval", 15);
-
-    state_server_addr = config.getString("state.server.addr", "0.0.0.0");
-    state_server_port = config.getInt("state.server.port", 8080);
+    pipeline_pool_size = config.getInt("pipeline.thread_pool.size", 5);
 
     transform_pool_size = config.getInt("transform.thread_pool.size", 10);
-    changeset_queue_size = transform_pool_size * 2;
-    trans_result_queue_size = transform_pool_size * 2;
+    transform_queue_size = transform_pool_size;
 
     merge_pool_size = config.getInt("merge.thread_pool.size", 10);
     merge_interval = config.getInt("merge.interval", 10000);
@@ -104,36 +101,34 @@ public class Config {
     loader_conn_size = config.getInt("loader.conn_pool.size", 10);
     loader_task_queue_size = config.getInt("loader.task_queue.size", 2);
 
-    dataSource = new ArrayList<String>();
-    dataSourceType = new ArrayList<String>();
-    tableMap = new HashMap<String, String>();
-    maxwellConf = new ArrayList<KafkaProviderConfig>();
-    debeziumConf = new ArrayList<KafkaProviderConfig>();
-  }
+    reporter = config.getString("metrics.reporter", "console");
+    report_interval = config.getInt("metrics.reporter.console.interval", 15);
 
-  protected void connectionConfig() throws BiremeException {
-    target = getConnConfig("target");
-    if (target.jdbcUrl == null) {
-      String message = "Please designate url for target Database.";
-      throw new BiremeException(message);
-    }
+    state_server_addr = config.getString("state.server.addr", "0.0.0.0");
+    state_server_port = config.getInt("state.server.port", 8080);
+
+    sourceConfig = new HashMap<String, SourceConfig>();
+    tableMap = new HashMap<String, String>();
   }
 
   /**
    * Get the connection configuration to database.
    *
    * @param prefix "target" database
-   * @return {@code ConnectionConfig} to database.
+   * @throws BiremeException when url of database is null
    */
-  protected ConnectionConfig getConnConfig(String prefix) {
-    Configuration subConfig = new SubsetConfiguration(config, prefix, ".");
-    ConnectionConfig connectionConfig = new ConnectionConfig();
+  protected void connectionConfig(String prefix) throws BiremeException {
+    Configuration subConfig = new SubsetConfiguration(config, "target", ".");
+    targetDatabase = new ConnectionConfig();
 
-    connectionConfig.jdbcUrl = subConfig.getString("url");
-    connectionConfig.user = subConfig.getString("user");
-    connectionConfig.passwd = subConfig.getString("passwd");
+    targetDatabase.jdbcUrl = subConfig.getString("url");
+    targetDatabase.user = subConfig.getString("user");
+    targetDatabase.passwd = subConfig.getString("passwd");
 
-    return connectionConfig;
+    if (targetDatabase.jdbcUrl == null) {
+      String message = "Please designate url for target Database.";
+      throw new BiremeException(message);
+    }
   }
 
   protected void dataSourceConfig() throws BiremeException, ConfigurationException {
@@ -144,47 +139,40 @@ public class Config {
       throw new BiremeException(message);
     }
     for (int i = 0; i < sources.length; i++) {
-      dataSource.add(sources[i]);
+      sourceConfig.put(sources[i], new SourceConfig(sources[i]));
     }
 
-    fetchProviderAndTableMap();
+    fetchSourceAndTableMap();
   }
 
   /**
    * Get the {@code Provider} configuration.
    *
-   * @throws BiremeException wrap and throw Exception which cannot be handled
+   * @throws BiremeException miss some required configuration
    * @throws ConfigurationException if an error occurred when loading the configuration
    */
-  protected void fetchProviderAndTableMap() throws BiremeException, ConfigurationException {
+  protected void fetchSourceAndTableMap() throws BiremeException, ConfigurationException {
     loadersCount = 0;
 
-    for (int i = 0; i < dataSource.size(); i++) {
-      String name = dataSource.get(i);
-      String type = config.getString(name + ".type");
-
-      dataSourceType.add(type);
+    for (SourceConfig conf : sourceConfig.values()) {
+      String type = config.getString(conf.name + ".type");
 
       switch (type) {
         case "maxwell":
-          KafkaProviderConfig conf = fetchMaxwellConfig(name);
-          conf.type = SourceType.MAXWELL;
-          conf.tableMap = fetchTableMap(conf.name);
-          maxwellConf.add(conf);
+          fetchMaxwellConfig(conf);
           break;
 
         case "debezium":
-          KafkaProviderConfig dconf = fetchDebeziumConfig(name);
-          dconf.type = SourceType.DEBEZIUM;
-          dconf.tableMap = fetchTableMap(dconf.name);
-          debeziumConf.add(dconf);
+          fetchDebeziumConfig(conf);
           break;
 
         default:
-          String message = "Unrecognized type for data source " + name;
+          String message = "Unrecognized type for data source " + conf.name;
           logger.fatal(message);
           throw new BiremeException(message);
       }
+
+      conf.tableMap = fetchTableMap(conf.name);
     }
 
     if (loader_conn_size > loadersCount) {
@@ -192,11 +180,17 @@ public class Config {
     }
   }
 
-  protected KafkaProviderConfig fetchDebeziumConfig(String prefix) throws BiremeException {
+  /**
+   * Get DebeziumSource configuration.
+   *
+   * @param debeziumConf An empty {@code SourceConfig}
+   * @throws BiremeException miss some required configuration
+   */
+  protected void fetchDebeziumConfig(SourceConfig debeziumConf) throws BiremeException {
+    String prefix = debeziumConf.name;
     Configuration subConfig = new SubsetConfiguration(config, prefix, ".");
-    KafkaProviderConfig debeziumConf = new KafkaProviderConfig();
 
-    debeziumConf.name = prefix;
+    debeziumConf.type = SourceType.DEBEZIUM;
     debeziumConf.server = subConfig.getString("kafka.server");
     debeziumConf.topic = prefix;
     debeziumConf.groupID = subConfig.getString("kafka.groupid", "bireme");
@@ -206,22 +200,19 @@ public class Config {
       logger.fatal(message);
       throw new BiremeException(message);
     }
-
-    return debeziumConf;
   }
 
   /**
-   * Get {@code MaxwellProvider} configuration.
+   * Get MaxwellConfig configuration.
    *
-   * @param prefix the Provider's name
-   * @return {@code MaxwellConfig} for {@code MaxwellProvider}
-   * @throws BiremeException - miss some required configuration
+   * @param maxwellConf an empty {@code SourceConfig}
+   * @throws BiremeException miss some required configuration
    */
-  protected KafkaProviderConfig fetchMaxwellConfig(String prefix) throws BiremeException {
+  protected void fetchMaxwellConfig(SourceConfig maxwellConf) throws BiremeException {
+    String prefix = maxwellConf.name;
     Configuration subConfig = new SubsetConfiguration(config, prefix, ".");
-    KafkaProviderConfig maxwellConf = new KafkaProviderConfig();
 
-    maxwellConf.name = prefix;
+    maxwellConf.type = SourceType.MAXWELL;
     maxwellConf.server = subConfig.getString("kafka.server");
     maxwellConf.topic = subConfig.getString("kafka.topic");
     maxwellConf.groupID = subConfig.getString("kafka.groupid", "bireme");
@@ -235,8 +226,6 @@ public class Config {
       String message = "Please designate topic for " + prefix + ".";
       throw new BiremeException(message);
     }
-
-    return maxwellConf;
   }
 
   private HashMap<String, String> fetchTableMap(String dataSource)
@@ -276,20 +265,23 @@ public class Config {
    */
   public void logConfig() {
     String config = "Configures: "
-        + "\n\tchangeSet queue size = " + changeset_queue_size + "\n\ttransform thread pool size = "
-        + transform_pool_size + "\n\ttransform result queue size = " + trans_result_queue_size
-        + "\n\trow cache size = " + row_cache_size + "\n\tmerge thread pool size = "
-        + merge_pool_size + "\n\tmerge interval = " + merge_interval
-        + "\n\tbatch size = " + batch_size + "\n\tloader conn size = " + loader_conn_size
-        + "\n\tloader task queue size = " + loader_task_queue_size
-        + "\n\treport interval = " + report_interval;
+        + "\n\tpipeline thread pool size = " + pipeline_pool_size
+        + "\n\ttransform thread pool size = " + transform_pool_size + "\n\ttransform queue size = "
+        + transform_queue_size + "\n\trow cache size = " + row_cache_size
+        + "\n\tmerge thread pool size = " + merge_pool_size
+        + "\n\tmerge interval = " + merge_interval + "\n\tbatch size = " + batch_size
+        + "\n\tloader connection size = " + loader_conn_size + "\n\tloader task queue size = "
+        + loader_task_queue_size + "\n\tloaders count = " + loadersCount
+        + "\n\treporter = " + reporter + "\n\treport interval = " + report_interval
+        + "\n\tstate server addr = " + state_server_addr + "\n\tstate server port = "
+        + state_server_port + "\n\ttarget database url = " + targetDatabase.jdbcUrl;
+
     logger.info(config);
 
     StringBuilder sb = new StringBuilder();
     sb.append("Data Source: \n");
-
-    for (int i = 0, len = dataSource.size(); i < len; i++) {
-      sb.append("\tType: " + dataSourceType.get(i) + " Name: " + dataSource.get(i) + "\n");
+    for (SourceConfig conf : sourceConfig.values()) {
+      sb.append("\tType: " + conf.type.name() + " Name: " + conf.name + "\n");
     }
 
     logger.info(sb.toString());

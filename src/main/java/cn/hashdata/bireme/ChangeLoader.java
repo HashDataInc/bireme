@@ -11,7 +11,6 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -22,21 +21,20 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
 
-import com.codahale.metrics.Gauge;
-import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
+
+import cn.hashdata.bireme.pipeline.PipeLine;
 
 /**
  * {@code ChangeLoader} poll tasks and load the tasks to database. Each {@code ChangeLoader}
- * corresponds to a specific table. All {@code ChangeLoaders} share connections to the database.
+ * corresponds to a specific table in a {@code PipeLine}. All {@code ChangeLoaders} share
+ * connections to the database.
  *
  * @author yuze
  *
@@ -45,7 +43,7 @@ public class ChangeLoader implements Callable<Long> {
   protected static final Long TIMEOUT_MS = 1000L;
   protected static final Long DELETE_TIMEOUT_NS = 10000000000L;
 
-  private Logger logger = LogManager.getLogger("Bireme." + ChangeLoader.class);
+  public Logger logger;
 
   protected boolean optimisticMode = true;
   protected Context cxt;
@@ -54,10 +52,9 @@ public class ChangeLoader implements Callable<Long> {
   protected LinkedBlockingQueue<Future<LoadTask>> taskIn;
   protected Table table;
   protected LoadTask currentTask;
-  ExecutorService threadPool;
+  protected ExecutorService copyThread;
 
-  private LoadState state;
-  private String mappedTable;
+  public String mappedTable;
 
   private Timer copyForDeleteTimer;
   private Timer deleteTimer;
@@ -67,121 +64,97 @@ public class ChangeLoader implements Callable<Long> {
   /**
    * Create a new {@code ChangeLoader}.
    *
-   * @param cxt bireme context
-   * @param mappedTable the corresponding table
+   * @param cxt the Bireme Context
+   * @param pipeLine the {@code PipeLine} belongs to
+   * @param mappedTable the target table
+   * @param taskIn a queue to get {@code LoadTask}
    */
-  public ChangeLoader(Context cxt, String mappedTable) {
+  public ChangeLoader(Context cxt, PipeLine pipeLine, String mappedTable,
+      LinkedBlockingQueue<Future<LoadTask>> taskIn) {
     this.cxt = cxt;
     this.conf = cxt.conf;
     this.conn = null;
-    this.state = null;
     this.mappedTable = mappedTable;
     this.table = cxt.tablesInfo.get(mappedTable);
-    taskIn = new LinkedBlockingQueue<Future<LoadTask>>(conf.loader_task_queue_size);
-    threadPool = Executors.newFixedThreadPool(1);
+    this.taskIn = taskIn;
+    this.copyThread = Executors.newFixedThreadPool(1);
 
-    cxt.metrics.register(
-        MetricRegistry.name(Context.class, "TaskQueue for " + mappedTable), new Gauge<Integer>() {
-          @Override
-          public Integer getValue() {
-            return taskIn.size();
-          }
-        });
+    // add statistics
+    Timer[] timers = pipeLine.stat.addTimerForLoader(mappedTable);
+    copyForDeleteTimer = timers[0];
+    deleteTimer = timers[1];
+    copyForInsertTimer = timers[2];
 
-    copyForDeleteTimer =
-        cxt.metrics.timer(MetricRegistry.name(ChangeLoader.class, mappedTable, "CopyForDelete"));
-    deleteTimer = cxt.metrics.timer(MetricRegistry.name(ChangeLoader.class, mappedTable, "Delete"));
-    copyForInsertTimer =
-        cxt.metrics.timer(MetricRegistry.name(ChangeLoader.class, mappedTable, "CopyForInsert"));
+    logger = pipeLine.logger;
   }
 
   /**
-   * Call the {@code ChangeLoader} to work.
+   * Get the task and copy it to target database
+   *
+   * @throws BiremeException load exception
+   * @throws InterruptedException interrupted when load the task
+   * @return if normally end, return 0
    */
-  public Long call() {
-    Thread.currentThread().setName("ChangeLoader for " + mappedTable);
-
-    logger.info("Loader Start, corresponding table {}.", mappedTable);
-
-    try {
-      while (!cxt.stop) {
-        // get task
+  @Override
+  public Long call() throws BiremeException, InterruptedException {
+    while (!cxt.stop) {
+      // get task
+      if (currentTask == null) {
         currentTask = pollTask();
+      }
 
-        if (cxt.stop) {
-          break;
-        }
+      if (currentTask == null) {
+        break;
+      }
 
-        // get connection
-        getConnection();
+      // get connection
+      conn = getConnection();
+      if (conn == null) {
+        logger.warn("Unable to get Connection.");
+        break;
+      }
 
-        if (cxt.stop) {
-          break;
-        }
+      try {
+        executeTask();
+      } catch (BiremeException e) {
+        logger.error("Fail to execute task. Message: {}", e.getMessage());
 
         try {
-          executeTask();
-        } catch (InterruptedException | BiremeException e) {
-          try {
-            conn.rollback();
-          } catch (Exception ignore) {
-          }
-          throw e;
-        } finally {
-          releaseConnection();
-          currentTask.reset();
-          currentTask = null;
+          conn.rollback();
+        } catch (Exception ignore) {
+          logger.error("Fail to roll back after load exception. Message: {}", e.getMessage());
         }
+
+        throw e;
+      } finally {
+        releaseConnection();
+        currentTask.destory();
+        currentTask = null;
+        conn = null;
       }
-    } catch (InterruptedException | BiremeException e) {
-      logger.error("Loader exit on error, corresponding table {}. Message {}\n", mappedTable,
-          e.getMessage());
-      logger.fatal("Stack Trace: ", e);
-      return 0L;
-    } finally {
-      threadPool.shutdown();
     }
-
-    logger.info("Loader exit, corresponding table {}.", mappedTable);
     return 0L;
-  }
-
-  public synchronized LoadState getLoadState() {
-    return this.state;
-  }
-
-  private synchronized void setLoadState(LoadState state) {
-    this.state = state;
   }
 
   /**
    * Check whether {@code Rows} have been merged to a task. If done, poll the task and return.
    *
-   * @return a task need be load to database
-   * @throws InterruptedException if interrupted while waiting
+   * @return a task need be loaded to database
    * @throws BiremeException merge task failed
+   * @throws InterruptedException if the current thread was interrupted while waiting
    */
-  protected LoadTask pollTask() throws InterruptedException, BiremeException {
+  protected LoadTask pollTask() throws BiremeException, InterruptedException {
     LoadTask task = null;
+    Future<LoadTask> head = taskIn.peek();
 
-    while (!cxt.stop) {
-      Future<LoadTask> head = taskIn.peek();
+    if (head != null && head.isDone()) {
+      taskIn.remove();
 
-      if (head != null && head.isDone()) {
-        taskIn.remove();
-
-        try {
-          task = head.get();
-        } catch (ExecutionException e) {
-          throw new BiremeException("Merge task failed.\n", e.getCause());
-        }
-
-        if (task != null) {
-          break;
-        }
+      try {
+        task = head.get();
+      } catch (ExecutionException e) {
+        throw new BiremeException("Merge task failed.\n", e.getCause());
       }
-
-      Thread.sleep(1);
     }
 
     return task;
@@ -190,42 +163,34 @@ public class ChangeLoader implements Callable<Long> {
   /**
    * Get connection to the destination database from connection pool.
    *
-   * @throws InterruptedException - if interrupted while waiting
-   * @throws BiremeException - wrap and throw Exception which cannot be handled
+   * @return the connection
+   * @throws BiremeException when unable to create temporary table
    */
-  protected void getConnection() throws InterruptedException, BiremeException {
-    do {
-      conn = cxt.loaderConnections.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
-    } while (conn == null && !cxt.stop);
-
-    HashSet<String> temporaryTables = cxt.temporaryTables.get(conn);
+  protected Connection getConnection() throws BiremeException {
+    Connection connection = cxt.loaderConnections.poll();
+    HashSet<String> temporaryTables = cxt.temporaryTables.get(connection);
 
     if (!temporaryTables.contains(mappedTable)) {
-      createTemporaryTable();
+      createTemporaryTable(connection);
       temporaryTables.add(mappedTable);
     }
+    return connection;
   }
 
   /**
    * Return the connection to connection pool.
    *
-   * @throws InterruptedException - if interrupted while waiting
    */
-  protected void releaseConnection() throws InterruptedException {
-    boolean success;
-
-    do {
-      success = cxt.loaderConnections.offer(conn, TIMEOUT_MS, TimeUnit.MILLISECONDS);
-    } while (!success && !cxt.stop);
-
+  protected void releaseConnection() {
+    cxt.loaderConnections.offer(conn);
     conn = null;
   }
 
   /**
    * Load the task to destination database. First load the delete set and then load the insert set.
    *
-   * @throws BiremeException - Wrap and throw Exception which cannot be handled
-   * @throws InterruptedException - if interrupted while waiting
+   * @throws BiremeException Wrap the exception when load the task
+   * @throws InterruptedException if interrupted while waiting
    */
   protected void executeTask() throws BiremeException, InterruptedException {
     if (!currentTask.delete.isEmpty() || (!optimisticMode && !currentTask.insert.isEmpty())) {
@@ -272,9 +237,6 @@ public class ChangeLoader implements Callable<Long> {
         throw new BiremeException(message, e);
       }
     }
-
-    currentTask.loadState.setCompleteTime(new Date().getTime());
-    setLoadState(currentTask.loadState);
 
     for (CommitCallback callback : currentTask.callbacks) {
       callback.done();
@@ -347,7 +309,7 @@ public class ChangeLoader implements Callable<Long> {
     }
 
     String sql = getCopySql(tableName, columnList);
-    copyResult = threadPool.submit(new TupleCopyer(pipeIn, sql, conn));
+    copyResult = copyThread.submit(new TupleCopyer(pipeIn, sql, conn));
 
     tupleWriter(pipeOut, tuples);
 
@@ -492,7 +454,7 @@ public class ChangeLoader implements Callable<Long> {
     return mappedTable.replace('.', '_');
   }
 
-  private void createTemporaryTable() throws BiremeException {
+  private void createTemporaryTable(Connection conn) throws BiremeException {
     String sql = "CREATE TEMP TABLE " + getTemporaryTableName()
         + " ON COMMIT DELETE ROWS AS SELECT * FROM " + mappedTable + " LIMIT 0;";
 

@@ -11,8 +11,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map.Entry;
-import java.util.concurrent.Callable;
+import java.util.Iterator;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -27,14 +26,19 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.daemon.Daemon;
 import org.apache.commons.daemon.DaemonContext;
 import org.apache.commons.daemon.DaemonInitException;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.PartitionInfo;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.JmxReporter;
 
-import cn.hashdata.bireme.provider.DebeziumProvider;
-import cn.hashdata.bireme.provider.MaxwellProvider;
+import cn.hashdata.bireme.pipeline.DebeziumPipeLine;
+import cn.hashdata.bireme.pipeline.KafkaPipeLine;
+import cn.hashdata.bireme.pipeline.MaxwellPipeLine;
+import cn.hashdata.bireme.pipeline.PipeLine;
+import cn.hashdata.bireme.pipeline.SourceConfig;
 
 /**
  * {@code Bireme} is an incremental synchronization tool. It could sync update in MySQL to GreenPlum
@@ -49,7 +53,7 @@ public class Bireme implements Daemon {
   private DaemonContext context;
   private Context cxt;
 
-  private Logger logger = LogManager.getLogger("Bireme." + Bireme.class);
+  private Logger logger = LogManager.getLogger("Bireme");
 
   private ConsoleReporter consoleReporter;
   private JmxReporter jmxReporter;
@@ -88,11 +92,16 @@ public class Bireme implements Daemon {
     cxt = new Context(new Config(config));
   }
 
+  /**
+   * Get metadata about the table from target database.
+   *
+   * @throws BiremeException when fail to connect or get the metadata
+   */
   protected void getTableInfo() throws BiremeException {
     logger.info("Start getting metadata of target tables from target database.");
 
     String[] strArray;
-    Connection conn = BiremeUtility.jdbcConn(cxt.conf.target);
+    Connection conn = BiremeUtility.jdbcConn(cxt.conf.targetDatabase);
 
     for (String fullname : cxt.tableMap.values()) {
       if (cxt.tablesInfo.containsKey(fullname)) {
@@ -111,6 +120,11 @@ public class Bireme implements Daemon {
     logger.info("Finish getting metadata of target tables from target database.");
   }
 
+  /**
+   * Establish connections to the target database.
+   *
+   * @throws BiremeException fail to connect
+   */
   protected void initLoaderConnections() throws BiremeException {
     logger.info("Start establishing connections for loaders.");
 
@@ -120,7 +134,7 @@ public class Bireme implements Daemon {
 
     try {
       for (int i = 0, number = cxt.conf.loader_conn_size; i < number; i++) {
-        conn = BiremeUtility.jdbcConn(cxt.conf.target);
+        conn = BiremeUtility.jdbcConn(cxt.conf.targetDatabase);
         conn.setAutoCommit(true);
         Statement stmt = conn.createStatement();
         stmt.execute("set enable_nestloop = on;");
@@ -148,43 +162,37 @@ public class Bireme implements Daemon {
     logger.info("Finishing establishing {} connections for loaders.", cxt.conf.loader_conn_size);
   }
 
-  protected void createMaxwellChangeProvider() {
-    for (int i = 0, len = cxt.conf.maxwellConf.size(); i < len; i++) {
-      Callable<Long> maxwellProvider = new MaxwellProvider(cxt, cxt.conf.maxwellConf.get(i));
-      cxt.cs.submit(maxwellProvider);
+  protected void closeConnections() throws SQLException {
+    for (Connection conn : cxt.loaderConnections) {
+      conn.close();
     }
   }
 
-  protected void createDebeziumProvider() {
-    for (int i = 0, len = cxt.conf.debeziumConf.size(); i < len; i++) {
-      Callable<Long> debeziumProvider = new DebeziumProvider(cxt, cxt.conf.debeziumConf.get(i));
-      cxt.cs.submit(debeziumProvider);
-    }
-  }
+  protected void createPipeLine() {
+    for (SourceConfig conf : cxt.conf.sourceConfig.values()) {
+      switch (conf.type) {
+        case MAXWELL:
+          KafkaConsumer<String, String> consumer =
+              KafkaPipeLine.createConsumer(conf.server, conf.groupID);
+          Iterator<PartitionInfo> iter = consumer.partitionsFor(conf.topic).iterator();
 
-  protected void createChangeDispatcher() {
-    Callable<Long> dispacher = new Dispatcher(cxt);
-    cxt.cs.submit(dispacher);
-  }
+          while (iter.hasNext()) {
+            PipeLine pipeLine = new MaxwellPipeLine(cxt, conf, iter.next().partition());
+            cxt.pipeLines.add(pipeLine);
+            conf.pipeLines.add(pipeLine);
+          }
+          break;
 
-  protected void createTaskGenerator() {
-    Callable<Long> taskGenerator = new TaskGenerator(cxt);
-    cxt.cs.submit(taskGenerator);
-  }
+        case DEBEZIUM:
+          for (String sourceTable : conf.tableMap.keySet()) {
+            PipeLine pipeLine = new DebeziumPipeLine(cxt, conf, sourceTable);
+            cxt.pipeLines.add(pipeLine);
+            conf.pipeLines.add(pipeLine);
+          }
+          break;
 
-  protected void createChangeLoaders() {
-    HashMap<String, ChangeLoader> loaders = cxt.changeLoaders;
-    HashMap<String, String> tableMap = cxt.tableMap;
-    ChangeLoader loader;
-    String mappedTable;
-
-    for (Entry<String, String> map : tableMap.entrySet()) {
-      mappedTable = map.getValue();
-
-      if (!loaders.containsKey(mappedTable)) {
-        loader = new ChangeLoader(cxt, mappedTable);
-        loaders.put(mappedTable, loader);
-        cxt.loadercs.submit(loader);
+        default:
+          break;
       }
     }
   }
@@ -196,14 +204,14 @@ public class Bireme implements Daemon {
   protected void startReporter() {
     switch (cxt.conf.reporter) {
       case "console":
-        consoleReporter = ConsoleReporter.forRegistry(cxt.metrics)
+        consoleReporter = ConsoleReporter.forRegistry(cxt.register)
                               .convertRatesTo(TimeUnit.SECONDS)
                               .convertDurationsTo(TimeUnit.MILLISECONDS)
                               .build();
         consoleReporter.start(cxt.conf.report_interval, TimeUnit.SECONDS);
         break;
       case "jmx":
-        jmxReporter = JmxReporter.forRegistry(cxt.metrics).build();
+        jmxReporter = JmxReporter.forRegistry(cxt.register).build();
         jmxReporter.start();
         break;
       default:
@@ -235,13 +243,9 @@ public class Bireme implements Daemon {
       throw e;
     }
 
-    createChangeLoaders();
-    createTaskGenerator();
-    createChangeDispatcher();
-    createMaxwellChangeProvider();
-    createDebeziumProvider();
+    createPipeLine();
+    cxt.startScheduler();
     startReporter();
-    cxt.server.start();
 
     if (context != null) {
       cxt.startWatchDog(context.getController());
@@ -249,7 +253,7 @@ public class Bireme implements Daemon {
   }
 
   @Override
-  public void stop() throws Exception {
+  public void stop() {
     logger.info("stop Bireme daemon");
 
     if (cxt == null) {
@@ -259,11 +263,14 @@ public class Bireme implements Daemon {
     cxt.stop = true;
     logger.info("set stop flag to true");
 
-    cxt.server.stop();
-    cxt.threadPool.shutdownNow();
-    cxt.loaderThreadPool.shutdownNow();
+    cxt.waitForExit();
 
-    cxt.waitForComplete(true);
+    try {
+      closeConnections();
+    } catch (SQLException e) {
+      logger.warn(e.getMessage());
+    }
+
     logger.info("Bireme exit");
   }
 
@@ -272,36 +279,36 @@ public class Bireme implements Daemon {
     logger.info("destroy Bireme daemon");
   }
 
+  /**
+   * An entry to start {@code Bireme}.
+   *
+   * @param args arguments from command line.
+   */
   public void entry(String[] args) {
     try {
       parseCommandLine(args);
-    } catch (DaemonInitException e) {
+    } catch (Exception e) {
       logger.fatal("Init failed: {}.", e.getMessage());
       logger.fatal("Stack Trace: ", e);
       System.err.println(e.getMessage());
-      System.exit(1);
-    } catch (ConfigurationException | BiremeException e) {
-      logger.fatal("Init failed: {}.", e.getMessage());
-      logger.fatal("Stack Trace: ", e);
       e.printStackTrace();
       System.exit(1);
     }
 
     try {
       start();
-      cxt.waitForComplete(false);
+      cxt.waitForStop();
     } catch (Exception e) {
-      logger.fatal("Bireme is going to exit since: {}", e.getMessage());
+      logger.fatal("Bireme stop abnormally since: {}", e.getMessage());
       logger.fatal("Stack Trace: ", e);
-
-      cxt.stop = true;
-      cxt.threadPool.shutdownNow();
-      cxt.loaderThreadPool.shutdownNow();
     }
 
+    cxt.waitForExit();
+
     try {
-      cxt.waitForComplete(true);
-    } catch (BiremeException | InterruptedException ignored) {
+      closeConnections();
+    } catch (SQLException e) {
+      logger.warn(e.getMessage());
     }
 
     logger.info("Bireme exit");

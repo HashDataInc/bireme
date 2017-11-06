@@ -5,36 +5,15 @@
 package cn.hashdata.bireme;
 
 /**
- * {@code CommitCallback} is called after a loadtask successfully completed.
+ * {@code CommitCallback} traces a {@link ChangeSet}. After the {@code ChangeSet} is loaded, mark it
+ * as committed.
  *
  * @author yuze
  *
  */
 public interface CommitCallback {
   /**
-   * Get the type of this {@code Position}. Usually, each type of data source has a specific method
-   * to represent the position.
-   *
-   * @return the type of this {@code Position}.
-   */
-  public String getType();
-
-  /**
-   * Serialize this {@code Position} in order to store it in the database.
-   *
-   * @return the serialized {@code Position}.
-   */
-  public String toStirng();
-
-  /**
-   * Restore this {@code Position} according the serialized {@code Position}.
-   *
-   * @param str the serialized {@code Position}.
-   */
-  public void fromString(String str);
-
-  /**
-   * Set the number of corresponding tables
+   * Set the number of corresponding tables.
    *
    * @param tables number of tables
    */
@@ -46,7 +25,7 @@ public interface CommitCallback {
   public void done();
 
   /**
-   * Whether this callback is ready to commit
+   * Whether this callback is ready to commit.
    *
    * @return ready or not
    * @throws BiremeException if this callback has committed
@@ -57,4 +36,16 @@ public interface CommitCallback {
    * Commit this callback.
    */
   public void commit();
+
+  /**
+   * Set the produce time of the newest record in corresponding set.
+   *
+   * @param time the produce time
+   */
+  public void setNewestRecord(Long time);
+
+  /**
+   * Destory this {@code CommitCallback} to release the memory.
+   */
+  public void destory();
 }
