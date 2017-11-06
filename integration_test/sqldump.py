@@ -4,7 +4,7 @@ import binascii
 import re
 from cStringIO import StringIO
 
-def sqlDump(dbtype, host, port, user, passwd, db, table, *key):
+def sqldump(dbtype, host, port, user, passwd, db, table, *key):
     try:
         connection = getConnection(dbtype, host, port, user, passwd, db)
         dbhandler = connection.cursor()
