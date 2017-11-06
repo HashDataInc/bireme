@@ -135,6 +135,7 @@ HTTP 服务器提供了下列端点:
 
 ```
 {
+
   "source_name": "XXX",
   "type": "XXX"
   "pipelines": [

@@ -149,6 +149,7 @@ The following is an example of Load State:
     {
       "name": "XXXXXX",
       "latest": "yyyy-MM-ddTHH:mm:ss.SSSZ",
+
       "delay": XX.XXX
     },
   ]

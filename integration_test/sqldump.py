@@ -11,7 +11,11 @@ def sqldump(dbtype, host, port, user, passwd, db, table, *key):
         nameAndType = getNameAndType(dbtype, host, port, user, passwd, db, table)
         nameAndType.sort()
 
-        names = ["\"" + line[0] + "\"" for line in nameAndType]
+        if dbtype.lower() == "postgres":
+            names = ["\"" + line[0] + "\"" for line in nameAndType]
+        elif dbtype.lower() == "mysql":
+            names = [line[0] for line in nameAndType]
+            
         types = [line[1] for line in nameAndType]
 
         dbhandler = getHandler(dbtype, host, port, user, passwd, db)
@@ -42,7 +46,6 @@ def getNameAndType(dbtype, host, port, user, passwd, db, table):
 
     dbhandler = conn.cursor()
     dbhandler.execute("SELECT column_name, data_type FROM information_schema.columns WHERE table_name='" + table + "' ORDER BY column_name")
-
     return [line for line in dbhandler.fetchall()]
 
 def mysqlDump(dbhandler, types):

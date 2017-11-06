@@ -27,7 +27,6 @@ public class PipeLineStat {
   public Timer avgDelay;
   public Meter recordCount;
   public Gauge<String> completed;
-  // TODO gap current time - completed
   public Gauge<Long> transformQueueSize;
 
   public HashMap<String, Gauge<Long>> cacheSize;

@@ -11,11 +11,15 @@ def sqlCheckSum(dbtype, host, port, user, passwd, db, table, *key):
         nameAndType = getNameAndType(dbtype, host, port, user, passwd, db, table)
         nameAndType.sort()
 
-        names = ["\"" + line[0] + "\"" for line in nameAndType]
+        if dbtype.lower() == "postgres":
+            names = ["\"" + line[0] + "\"" for line in nameAndType]
+        elif dbtype.lower() == "mysql":
+            names = [line[0] for line in nameAndType]
         types = [line[1] for line in nameAndType]
 
         dbhandler = getHandler(dbtype, host, port, user, passwd, db)
         dbhandler.execute("SELECT " + ", ".join(names) + " FROM " + table + " order by " + ", ".join(key))
+        
         if dbtype.lower() == "mysql":
             return mysqlCheckSum(dbhandler, types)
         elif dbtype.lower() == "postgres":
@@ -23,7 +27,6 @@ def sqlCheckSum(dbtype, host, port, user, passwd, db, table, *key):
 
     except Exception as e:
         print e
-
 
 def getHandler(dbtype, host, port, user, passwd, db):
     if dbtype.lower() == "mysql":
@@ -41,7 +44,6 @@ def getNameAndType(dbtype, host, port, user, passwd, db, table):
 
     dbhandler = conn.cursor()
     dbhandler.execute("SELECT column_name, data_type FROM information_schema.columns WHERE table_name='" + table + "' ORDER BY column_name")
-
     return [line for line in dbhandler.fetchall()]
 
 def mysqlCheckSum(dbhandler, types):
@@ -51,7 +53,7 @@ def mysqlCheckSum(dbhandler, types):
     for line in dbhandler:
         if not line:
             break;
-
+          
         for i in length:
             if line[i] is None:
                 checksum.update(str(line[i]) + "\t")
