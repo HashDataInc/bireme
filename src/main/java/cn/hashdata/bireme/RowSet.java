@@ -22,6 +22,9 @@ public class RowSet {
     rowBucket = new HashMap<String, ArrayList<Row>>();
   }
 
+  /**
+   * Destroy the {@code RowSet}.
+   */
   public void destory() {
     createdAt = null;
     rowBucket.clear();

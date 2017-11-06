@@ -13,7 +13,7 @@ package cn.hashdata.bireme;
  */
 public interface CommitCallback {
   /**
-   * Set the number of corresponding tables
+   * Set the number of corresponding tables.
    *
    * @param tables number of tables
    */
@@ -25,7 +25,7 @@ public interface CommitCallback {
   public void done();
 
   /**
-   * Whether this callback is ready to commit
+   * Whether this callback is ready to commit.
    *
    * @return ready or not
    * @throws BiremeException if this callback has committed
@@ -38,14 +38,14 @@ public interface CommitCallback {
   public void commit();
 
   /**
-   * Set the produce time of the newest record in corresponding set
+   * Set the produce time of the newest record in corresponding set.
    *
    * @param time the produce time
    */
   public void setNewestRecord(Long time);
 
   /**
-   * Destory this {@code CommitCallback} release the memory
+   * Destory this {@code CommitCallback} to release the memory.
    */
   public void destory();
 }

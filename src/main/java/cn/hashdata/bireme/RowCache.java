@@ -175,9 +175,7 @@ public class RowCache {
       this.callbacks = callbacks;
     }
 
-    /**
-     * Run the {@code RowBatchMerger}.
-     */
+    @Override
     public LoadTask call() {
       LoadTask task = new LoadTask();
 

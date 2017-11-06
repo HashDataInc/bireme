@@ -23,7 +23,6 @@ public class LoadTask {
 
   /**
    * Create a new {@code LoadTask}.
-   *
    */
   public LoadTask() {
     this.callbacks = new ArrayList<CommitCallback>();
@@ -31,6 +30,9 @@ public class LoadTask {
     this.insert = new HashMap<String, String>();
   }
 
+  /**
+   * Destroy the {@code LoadTask}.
+   */
   public void destory() {
     callbacks.clear();
     delete.clear();

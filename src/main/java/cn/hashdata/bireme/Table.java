@@ -34,15 +34,6 @@ public class Table {
   public HashMap<String, Integer> columnPrecision;
   public HashMap<String, Integer> columnScale;
 
-  public Table() {
-    this.ncolumns = 0;
-    this.columnName = new ArrayList<String>();
-    this.keyNames = new ArrayList<String>();
-    this.columnType = new HashMap<String, Integer>();
-    this.columnPrecision = new HashMap<String, Integer>();
-    this.columnScale = new HashMap<String, Integer>();
-  }
-
   /**
    * Get metadata of a specific table using a given connection and construct a new {@code Table}.
    *

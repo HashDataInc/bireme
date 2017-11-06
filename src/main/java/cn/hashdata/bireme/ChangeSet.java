@@ -17,6 +17,9 @@ public class ChangeSet {
   public Object changes;
   public CommitCallback callback;
 
+  /**
+   * Destroy the {@code ChangeSet}
+   */
   public void destory() {
     createdAt = null;
     changes = null;

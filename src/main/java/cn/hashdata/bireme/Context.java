@@ -184,12 +184,13 @@ class BiremeThreadFactory implements ThreadFactory {
   private final AtomicInteger threadNumber = new AtomicInteger(1);
   private final String namePrefix;
 
-  BiremeThreadFactory(String poolName) {
+  public BiremeThreadFactory(String poolName) {
     SecurityManager s = System.getSecurityManager();
     group = (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
     namePrefix = "pool-" + poolName + "-thread-";
   }
 
+  @Override
   public Thread newThread(Runnable r) {
     Thread t = new Thread(group, r, namePrefix + threadNumber.getAndIncrement(), 0);
     if (t.isDaemon())
