@@ -47,6 +47,10 @@ Bireme 从数据源读取数据 (Record)，将其转化为内部格式 (Row) 并
 
 ![bireme](docs/bireme.png)
 
+下图描述了在一个 pipeline 中对 change data 的处理过程。
+
+![bireme](docs/pipeline.png)
+
 ## 1.4 配置文件介绍
 
 配置文件包括两部分：  
@@ -86,14 +90,15 @@ Bireme 从数据源读取数据 (Record)，将其转化为内部格式 (Row) 并
 
 |参数|描述|默认值|
 |:---:|:---:|:---:|
-|metrics.reporter|Bireme指定了两种监控模式，一种是 console ，另外一种是 jmx ，如果不需要监控，可以指定为 none|console|
-|metrics.reporter.console.interval|输出 metrics 的时间间隔，当 metrics.reporter 为 console 有效，单位秒|10|
-|loader.conn_pool.size|目标数据库的连接个数，小于等于 Change Loader 的数量|10|
-|loader.task_queue.size|每个 Change Loader 中 Task 队列的长度|2|
-|transform.pool.size|用于 Transform 的线程池大小|10|
+|pipeline.thread_pool.size|Pipeline 线程池的大小|5|
+|transform.thread_pool.size|用于 Transform 的线程池大小|10|
 |merge.pool.size|用于 Merge 的线程池大小|10|
 |merge.interval|最大 Merge 间隔，单位毫秒|10000|
 |merge.batch.size|单次 Merge 中最多的 Row 的数量|50000|
+|loader.conn_pool.size|目标数据库的连接个数，小于等于 Change Loader 的数量|10|
+|loader.task_queue.size|每个 Change Loader 中 Task 队列的长度|2|
+|metrics.reporter|Bireme指定了两种监控模式，一种是 console ，另外一种是 jmx ，如果不需要监控，可以指定为 none|console|
+|metrics.reporter.console.interval|输出 metrics 的时间间隔，当 metrics.reporter 为 console 有效，单位秒|10|
 |state.server.addr|state server 的IP地址|0.0.0.0|
 |state.server.port|state server 的端口号|8080|
 
@@ -109,18 +114,6 @@ Bireme 从数据源读取数据 (Record)，将其转化为内部格式 (Row) 并
 
 ## 1.5 监控
 
-**Load State**
-
-Bireme 采用批量加载的方式加载数据，用 Load State 来记录每一个 task 的状态。对于一张目标表，Bireme 用最近完成的 task 的 Load State 来表示它的状态。
-
-描述一个 Load State 需要用到三类时间。
-
-|时间类型|描述|
-|:---:|:---:|
-|produce time|produce time 是每条记录产生并进入 Kafka 的时间。每个task中，Bireme 为每个 数据源记录最新一条纪录的产生时间。|
-|receive time|receive time 是每条记录被消费进入 Bireme 的时间。每个task中，Bireme 为每个数据源记录最早一条记录的进入时间。这么做是为了监控一条数据从进入 Bireme 到被加载到数据仓库所需最长时间。|
-|complete time|complete time 记录了每个 task 被成功加载的时间。|
-
 **HTTP 服务器**
 
 Bireme 启动一个轻量级的 HTTP 服务器方便用户获取当前的 Load State.
@@ -129,8 +122,8 @@ HTTP 服务器提供了下列端点:
 
 |端点|描述|
 |:---:|:---:|
-|/|获取所有目标表的 Load State|
-|/\<target table\>|获取所有指定表的 Load State|
+|/|获取所有数据源的同步状态|
+|/\<data source\>|获取指定数据源的同步状态|
 
 返回结果为 JSON 格式。使用参数 *pretty* 可以以用户友好的方式输出结果。
 
@@ -140,26 +133,27 @@ HTTP 服务器提供了下列端点:
 
 ```
 {
-  "target_table": "public.chartarget",
-  "sources": [
+  "source_name": "debezium_CI",
+  "pipelines": [
     {
-      "source": "debezium_CI",
-      "table_name": "public.charsource",
-      "produce_time": "2017-10-12T16:27:40.812Z",
-      "receive_time": "2017-10-12T16:30:10.160Z"
-    }
-  ],
-  "complete_time": "2017-10-12T16:30:20.009Z"
+      "name": "Debezium-debezium_CI-debezium_CI.public.charsource",
+      "newest_record": "yyyy-MM-ddTHH:mm:ss.SSSZ",
+      "delay": XX.XXX
+    },
+    {
+      "name": "Debezium-debezium_CI-debezium_CI.public.binarysource",
+      "newest_record": "yyyy-MM-ddTHH:mm:ss.SSSZ",
+      "delay": XX.XXX
+    },
+  ]
 }
 ```
 
-* *target_table* 表示目标表名。
-* *sources* 是一个数组, 其中每一项对应一个数据源。 (每一个目标表的数据可能来自多个数据源，尽管在示例中仅有一个数据源。)
- - *source* 数据源名称。
- - *table_name* 是数据源中的表名。
- - *produce_time* 见前文定义。
- - *receive_time* 见前文定义。
-* *complete_time* 见前文定义。
+* *source_name* 是数据源的名称，在配置文件中的指定。
+* *pipelines* 是包含了一组 pipeline 的同步状态。(每一个数据源可能用多个 pipeline 同时工作。)
+ - *name* 是 pipeline 的名称.
+ - *newest_record* 是成功被同步到 hashdata 中，最新的 change data 产生时间。
+ - *delay* 是从 change data 进入到成功加载并通知给数据的时间间隔。
 
 ## 1.6 参考
 

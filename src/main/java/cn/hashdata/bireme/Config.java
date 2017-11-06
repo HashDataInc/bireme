@@ -88,12 +88,12 @@ public class Config {
   }
 
   protected void basicConfig() {
-    pipeline_pool_size = config.getInt("pipeline.threadPool.size", 5);
+    pipeline_pool_size = config.getInt("pipeline.thread_pool.size", 5);
 
-    transform_pool_size = config.getInt("transform.threadPool.size", 10);
-    transform_queue_size = config.getInt("transform.resultQueue.size", 10);
+    transform_pool_size = config.getInt("transform.thread_pool.size", 10);
+    transform_queue_size = transform_pool_size;
 
-    merge_pool_size = config.getInt("merge.threadPool.size", 10);
+    merge_pool_size = config.getInt("merge.thread_pool.size", 10);
     merge_interval = config.getInt("merge.interval", 10000);
     batch_size = config.getInt("merge.batch.size", 50000);
     row_cache_size = batch_size * 2;

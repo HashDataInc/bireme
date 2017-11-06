@@ -41,7 +41,6 @@ public abstract class KafkaPipeLine extends PipeLine {
 
   @Override
   public ChangeSet pollChangeSet() throws BiremeException {
-    // TODO can set parameter as 0L?
     ConsumerRecords<String, String> records = consumer.poll(POLL_TIMEOUT);
 
     if (cxt.stop || records.isEmpty()) {
