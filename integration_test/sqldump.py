@@ -1,19 +1,20 @@
 import MySQLdb
+import MySQLdb.cursors
 import psycopg2
+import psycopg2.extras
 import binascii
 import re
 from cStringIO import StringIO
 
 def sqldump(dbtype, host, port, user, passwd, db, table, *key):
     try:
-        connection = getConnection(dbtype, host, port, user, passwd, db)
-        dbhandler = connection.cursor()
-        nameAndType = getNameAndType(dbhandler, dbtype, table)
+        nameAndType = getNameAndType(dbtype, host, port, user, passwd, db, table)
         nameAndType.sort()
 
         names = ["\"" + line[0] + "\"" for line in nameAndType]
         types = [line[1] for line in nameAndType]
 
+        dbhandler = getHandler(dbtype, host, port, user, passwd, db)
         dbhandler.execute("SELECT " + ", ".join(names) + " FROM " + table + " order by " + ", ".join(key))
         
         if dbtype.lower() == "mysql":
@@ -23,25 +24,32 @@ def sqldump(dbtype, host, port, user, passwd, db, table, *key):
 
     except Exception as e:
         print e
-    finally:
-        connection.close()
 
-def getConnection(dbtype, host, port, user, passwd, db):
+
+def getHandler(dbtype, host, port, user, passwd, db):
     if dbtype.lower() == "mysql":
-        return MySQLdb.connect(host=host, port=port, user=user, passwd=passwd, db=db)
+        conn = MySQLdb.connect(host=host, port=port, user=user, passwd=passwd, db=db, cursorclass=MySQLdb.cursors.SSCursor)
+        return conn.cursor()
     else:
-        return psycopg2.connect(host=host, port=port, user=user, password=passwd, dbname=db)
+        conn = psycopg2.connect(host=host, port=port, user=user, password=passwd, dbname=db)
+        return conn.cursor('my_cursor', cursor_factory=psycopg2.extras.DictCursor)
 
-def getNameAndType(dbhandler, dbtype, table):
+def getNameAndType(dbtype, host, port, user, passwd, db, table):
+    if dbtype.lower() == "mysql":
+        conn = MySQLdb.connect(host=host, port=port, user=user, passwd=passwd, db=db, cursorclass=MySQLdb.cursors.SSCursor)
+    else:
+        conn = psycopg2.connect(host=host, port=port, user=user, password=passwd, dbname=db)
+
+    dbhandler = conn.cursor()
     dbhandler.execute("SELECT column_name, data_type FROM information_schema.columns WHERE table_name='" + table + "' ORDER BY column_name")
+
     return [line for line in dbhandler.fetchall()]
 
 def mysqlDump(dbhandler, types):
     length = range(0, len(types))
     fileStr = StringIO()
 
-    while True:
-        line = dbhandler.fetchone()
+    for line in dbhandler:
         if not line:
             break;
 
@@ -62,8 +70,7 @@ def pgDump(dbhandler, types):
     length = range(0, len(types))
     fileStr = StringIO()
 
-    while True:
-        line = dbhandler.fetchone()
+    for line in dbhandler:
         if not line:
             break;
 

@@ -45,6 +45,8 @@ Debeziuk + Kafka 是 bireme 支持的另外一种数据源类型，架构如下�
 
 Bireme 从数据源读取数据 (Record)，将其转化为内部格式 (Row) 并缓存，当缓存数据达到一定量，将这些数据合并为一个任务 (Task)，每个任务包含两个集合，delete 集合与insert 集合，最后把这些数据更新到目标数据库。
 
+每个数据源可以有多个 pipeline，对于 maxwell，每个 Kafka partition 对应一个 pipeline；对于 debezium，每个 Kafka topic 对应一个 pipeline。
+
 ![bireme](docs/bireme.png)
 
 下图描述了在一个 pipeline 中对 change data 的处理过程。
@@ -133,16 +135,17 @@ HTTP 服务器提供了下列端点:
 
 ```
 {
-  "source_name": "debezium_CI",
+  "source_name": "XXX",
+  "type": "XXX"
   "pipelines": [
     {
-      "name": "Debezium-debezium_CI-debezium_CI.public.charsource",
-      "newest_record": "yyyy-MM-ddTHH:mm:ss.SSSZ",
+      "name": "XXXXXX",
+      "latest": "yyyy-MM-ddTHH:mm:ss.SSSZ",
       "delay": XX.XXX
     },
     {
-      "name": "Debezium-debezium_CI-debezium_CI.public.binarysource",
-      "newest_record": "yyyy-MM-ddTHH:mm:ss.SSSZ",
+      "name": "XXXXXX",
+      "latest": "yyyy-MM-ddTHH:mm:ss.SSSZ",
       "delay": XX.XXX
     },
   ]
@@ -150,9 +153,10 @@ HTTP 服务器提供了下列端点:
 ```
 
 * *source_name* 是数据源的名称，在配置文件中的指定。
+* *type* 是数据源的类型。
 * *pipelines* 是包含了一组 pipeline 的同步状态。(每一个数据源可能用多个 pipeline 同时工作。)
  - *name* 是 pipeline 的名称.
- - *newest_record* 是成功被同步到 hashdata 中，最新的 change data 产生时间。
+ - *latest* 是成功被同步到 hashdata 中，最新的 change data 产生时间。
  - *delay* 是从 change data 进入到成功加载并通知给数据的时间间隔。
 
 ## 1.6 参考

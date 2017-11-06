@@ -136,10 +136,8 @@ public class StateServer {
       Gson gson = null;
 
       if (format != null) {
-        gson = new GsonBuilder()
-                   .setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
-                   .setPrettyPrinting()
-                   .create();
+        gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").setPrettyPrinting()
+            .create();
       } else {
         gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").create();
       }
@@ -161,15 +159,15 @@ public class StateServer {
 
     private Source getSourceState(String sourceName) {
       SourceConfig conf = cxt.conf.sourceConfig.get(sourceName);
-      Source e = new Source(conf.name);
+      Source e = new Source(conf.name, conf.type.toString());
 
       for (PipeLine p : conf.pipeLines) {
-        String name = p.myName;
+        String name = p.myName.split("-")[2];
         PipeLineStat stat = p.stat;
-        Date newest_record = new Date(stat.newestCompleted);
+        Date latest = new Date(stat.newestCompleted);
         long delay = stat.delay;
 
-        e.pipelines.add(new Stat(name, newest_record, delay));
+        e.pipelines.add(new Stat(name, latest, delay));
       }
 
       return e;
@@ -178,21 +176,23 @@ public class StateServer {
 
   class Stat {
     String name;
-    Date newest_record;
+    Date latest;
     double delay;
 
-    public Stat(String name, Date newest_record, long delay) {
+    public Stat(String name, Date latest, long delay) {
       this.name = name;
-      this.newest_record = newest_record;
+      this.latest = latest;
       this.delay = delay / 1000.0;
     }
   }
   class Source {
     String source_name;
+    String type;
     ArrayList<Stat> pipelines;
 
-    public Source(String source_name) {
+    public Source(String source_name, String type) {
       this.source_name = source_name;
+      this.type = type;
       pipelines = new ArrayList<Stat>();
     }
   }
