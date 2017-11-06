@@ -11,7 +11,7 @@ def sqldump(dbtype, host, port, user, passwd, db, table, *key):
         nameAndType = getNameAndType(dbhandler, dbtype, table)
         nameAndType.sort()
 
-        names = [line[0] for line in nameAndType]
+        names = ["\"" + line[0] + "\"" for line in nameAndType]
         types = [line[1] for line in nameAndType]
 
         dbhandler.execute("SELECT " + ", ".join(names) + " FROM " + table + " order by " + ", ".join(key))
