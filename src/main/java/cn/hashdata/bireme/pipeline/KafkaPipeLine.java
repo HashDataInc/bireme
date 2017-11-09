@@ -154,10 +154,10 @@ public abstract class KafkaPipeLine extends PipeLine {
     public void commit() {
       HashMap<TopicPartition, OffsetAndMetadata> offsets =
           new HashMap<TopicPartition, OffsetAndMetadata>();
+
       partitionOffset.forEach((key, value) -> {
         String topic = key.split("\\+")[0];
         int partition = Integer.valueOf(key.split("\\+")[1]);
-
         offsets.put(new TopicPartition(topic, partition), new OffsetAndMetadata(value + 1));
       });
 

@@ -40,8 +40,8 @@ import cn.hashdata.bireme.pipeline.PipeLine;
  *
  */
 public class ChangeLoader implements Callable<Long> {
-  protected static final Long TIMEOUT_MS = 1000L;
   protected static final Long DELETE_TIMEOUT_NS = 10000000000L;
+  protected static final Long NANOSECONDS_TO_SECONDS = 1000000000L;
 
   public Logger logger;
 
@@ -259,10 +259,12 @@ public class ChangeLoader implements Callable<Long> {
     timerCTX = deleteTimer.time();
     deleteCounts = deleteWorker(mappedTable, temporaryTableName, keyNames);
 
-    if (timerCTX.stop() > DELETE_TIMEOUT_NS) {
+    long deleteTime = timerCTX.stop();
+    if (deleteTime > DELETE_TIMEOUT_NS) {
       String plan = deletePlan(mappedTable, temporaryTableName, keyNames);
 
-      logger.warn("Delete time exceed 10 seconds, delete plan:\n {}", plan);
+      logger.warn("Delete operation takes {} seconds, delete plan:\n {}",
+          deleteTime / NANOSECONDS_TO_SECONDS, plan);
     }
 
     return deleteCounts;
