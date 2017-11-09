@@ -17,6 +17,7 @@ import cn.hashdata.bireme.pipeline.PipeLine;
  *
  */
 public class PipeLineStat {
+  private static final Long SCECOND_TO_MILLISECOND = 1000L;
   private String pipeLineName;
   public Long newestCompleted = 0L;
   public Long delay = 0L;
@@ -27,6 +28,7 @@ public class PipeLineStat {
   public Timer avgDelay;
   public Meter recordCount;
   public Gauge<String> completed;
+  public Gauge<String> syncGap;
   public Gauge<Long> transformQueueSize;
 
   public HashMap<String, Gauge<Long>> cacheSize;
@@ -51,7 +53,16 @@ public class PipeLineStat {
 
       @Override
       public String getValue() {
-        return new Date(newestCompleted).toString();
+        return new Date(newestCompleted * SCECOND_TO_MILLISECOND).toString();
+      }
+    };
+
+    syncGap = new Gauge<String>() {
+
+      @Override
+      public String getValue() {
+        Long now = new Date().getTime() / SCECOND_TO_MILLISECOND;
+        return String.valueOf(now - newestCompleted) + "seconds.";
       }
     };
 
@@ -65,6 +76,7 @@ public class PipeLineStat {
     };
 
     register.register(MetricRegistry.name(pipeLineName, "Completed"), completed);
+    register.register(MetricRegistry.name(pipeLineName, "SyncGap"), syncGap);
     register.register(MetricRegistry.name(pipeLineName, "TransformQueueSize"), transformQueueSize);
   }
 
