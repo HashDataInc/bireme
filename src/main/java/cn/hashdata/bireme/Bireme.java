@@ -137,7 +137,10 @@ public class Bireme implements Daemon {
         conn = BiremeUtility.jdbcConn(cxt.conf.targetDatabase);
         conn.setAutoCommit(true);
         Statement stmt = conn.createStatement();
+
         stmt.execute("set enable_nestloop = on;");
+        stmt.execute("set enable_seqscan = off;");
+        stmt.execute("set enable_hashjoin = off;");
 
         try {
           stmt.execute("set gp_autostats_mode = none;");

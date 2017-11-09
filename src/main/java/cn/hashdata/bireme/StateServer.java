@@ -136,8 +136,10 @@ public class StateServer {
       Gson gson = null;
 
       if (format != null) {
-        gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").setPrettyPrinting()
-            .create();
+        gson = new GsonBuilder()
+                   .setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+                   .setPrettyPrinting()
+                   .create();
       } else {
         gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").create();
       }
