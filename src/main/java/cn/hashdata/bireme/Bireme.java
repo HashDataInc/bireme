@@ -32,12 +32,15 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.codahale.metrics.ConsoleReporter;
+import com.codahale.metrics.Gauge;
 import com.codahale.metrics.JmxReporter;
+import com.codahale.metrics.MetricRegistry;
 
 import cn.hashdata.bireme.pipeline.DebeziumPipeLine;
 import cn.hashdata.bireme.pipeline.KafkaPipeLine;
 import cn.hashdata.bireme.pipeline.MaxwellPipeLine;
 import cn.hashdata.bireme.pipeline.PipeLine;
+import cn.hashdata.bireme.pipeline.PipeLine.PipeLineState;
 import cn.hashdata.bireme.pipeline.SourceConfig;
 
 /**
@@ -198,6 +201,30 @@ public class Bireme implements Daemon {
           break;
       }
     }
+
+    // pipeline state statistics
+    Gauge<Integer> allCount = new Gauge<Integer>() {
+      @Override
+      public Integer getValue() {
+        return cxt.pipeLines.size();
+      }
+    };
+
+    Gauge<Integer> liveCount = new Gauge<Integer>() {
+      @Override
+      public Integer getValue() {
+        int live = 0;
+        for (PipeLine pipeline : cxt.pipeLines) {
+          if (pipeline.state == PipeLineState.NORMAL) {
+            live++;
+          }
+        }
+        return live;
+      }
+    };
+
+    cxt.register.register(MetricRegistry.name("All Pipeline Number"), allCount);
+    cxt.register.register(MetricRegistry.name("All Live Pipeline Number"), liveCount);
   }
 
   /**

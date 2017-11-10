@@ -27,6 +27,7 @@ public class PipeLineStat {
 
   public Timer avgDelay;
   public Meter recordCount;
+  public Gauge<String> pipeLineState;
   public Gauge<String> completed;
   public Gauge<String> syncGap;
   public Gauge<Long> transformQueueSize;
@@ -49,8 +50,14 @@ public class PipeLineStat {
     avgDelay = register.timer(MetricRegistry.name(pipeLineName, "AvgDelay"));
     recordCount = register.meter(MetricRegistry.name(pipeLineName, "RecordCount"));
 
-    completed = new Gauge<String>() {
+    pipeLineState = new Gauge<String>() {
+      @Override
+      public String getValue() {
+        return pipeLine.state.toString();
+      }
+    };
 
+    completed = new Gauge<String>() {
       @Override
       public String getValue() {
         return new Date(newestCompleted * SCECOND_TO_MILLISECOND).toString();
@@ -58,7 +65,6 @@ public class PipeLineStat {
     };
 
     syncGap = new Gauge<String>() {
-
       @Override
       public String getValue() {
         Long now = new Date().getTime() / SCECOND_TO_MILLISECOND;
@@ -67,14 +73,13 @@ public class PipeLineStat {
     };
 
     transformQueueSize = new Gauge<Long>() {
-
       @Override
       public Long getValue() {
         return (long) pipeLine.transResult.size();
       }
-
     };
 
+    register.register(MetricRegistry.name(pipeLineName, "PipeLine State"), pipeLineState);
     register.register(MetricRegistry.name(pipeLineName, "Completed"), completed);
     register.register(MetricRegistry.name(pipeLineName, "SyncGap"), syncGap);
     register.register(MetricRegistry.name(pipeLineName, "TransformQueueSize"), transformQueueSize);
