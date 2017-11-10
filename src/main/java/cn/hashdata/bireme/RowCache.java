@@ -124,6 +124,8 @@ public class RowCache {
     Future<LoadTask> task = mergerPool.submit(merger);
     mergeResult.add(task);
     localMerger.add(merger);
+
+    lastMergeTime = new Date().getTime();
   }
 
   /**
