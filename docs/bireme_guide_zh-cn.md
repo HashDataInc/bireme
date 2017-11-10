@@ -100,6 +100,21 @@ bin/bireme stop
 
 bireme 的输出及日志位于 logs 文件夹下。
 
+**JMX**
+
+|环境变量|缺省值|描述|
+|:---:|:---:|:---:|
+|JMX_PORT||JMX 端口号|
+|JMX_AUTH|false|JMX 客户端是否需要认证|
+|JMX_SSL|false|JMX 连接是否使用 SSL/TLS|
+|JMX_LOG4J|true|Log4J JMX MBeans 是否应该被禁用|
+
+默认会允许本地 JMX 连接，如果用户希望关闭 JMX，可以设置环境变量 `JMX_DISABLE=false`
+
+**HEAP SIZE**
+
+用户可以通过设置环境变量 MAX_HEAP 来指定 JVM 的 -Xmx 参数。`-Xmx${MAX_HEAP}m`
+
 # Part 2: Debezium 数据源
 
 在这一部分，将演示如何用 bireme 和 debezium 同步 Postgres 的一张表 public.source 到 GreenPlum 数据库 public.target。为了方便，我们使用 docker 部署 Postgres，Kafka 以及 Kafka Connect。

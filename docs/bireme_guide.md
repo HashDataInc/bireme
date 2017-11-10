@@ -103,6 +103,21 @@ bin/bireme stop
 
 Log files are located in *logs* directory.
 
+**JMX**
+
+|Environment Variable|Default|Description|
+|:---:|:---:|:---:|
+|JMX_PORT||Enables JMX and specifies the port number that will be used for JMX.|
+|JMX_AUTH|false|Whether JMX clients must use password authentication when connecting.|
+|JMX_SSL|false|Whether JMX clients connect using SSL/TLS.|
+|JMX_LOG4J|true|Whether the Log4J JMX MBeans should be disabled.|
+
+By default we allow local JMX connections. If you want to close JMX, set environment variable `JMX_DISABLE=false`.
+
+**HEAP SIZE**
+
+You can use `MAX_HEAP` variable to set the maxmium memory of JVM. The value is used to specify the JVM parameter `-Xmx${MAX_HEAP}m`
+
 # Part 2 Debezium Data Source
 
 In this part, we will demonstrate how to use bireme cooperated with debezium to synchronize a table named *public.source* in Postgres to another table named *public.target* in GreenPlum database. For convenience, we will use docker to set up Postgres, Kafka and Kafka Connect.
