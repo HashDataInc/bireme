@@ -114,20 +114,23 @@ public class ChangeLoader implements Callable<Long> {
         break;
       }
 
+      // Execute task and release connection. If failed, close the connection and abandon it.
       try {
         executeTask();
+        releaseConnection();
       } catch (BiremeException e) {
         logger.error("Fail to execute task. Message: {}", e.getMessage());
 
         try {
           conn.rollback();
+          conn.close();
         } catch (Exception ignore) {
           logger.error("Fail to roll back after load exception. Message: {}", e.getMessage());
+          throw e;
         }
-
         throw e;
+
       } finally {
-        releaseConnection();
         currentTask.destory();
         currentTask = null;
         conn = null;
