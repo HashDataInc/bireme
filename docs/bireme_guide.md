@@ -210,7 +210,7 @@ target.passwd = XXXXXX
 
 data_source = debezium
 
-debezium.type = maxwell
+debezium.type = debezium
 debezium.kafka.server = kafkahost:9092
 ```
 **Note:** The value of data_source must be identical to the `database.server.name` configuration in Section 1.2 and we don't need to designate a topic.
