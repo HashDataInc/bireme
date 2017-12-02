@@ -205,7 +205,7 @@ target.passwd = XXXXXX
 
 data_source = debezium
 
-debezium.type = maxwell
+debezium.type = debezium
 debezium.kafka.server = kafkahost:9092
 ```
 **Note:** data_source 的值必须与 1.2 部分中 `database.server.name` 配置项一致，这里不需要指定 Kafka topic。
