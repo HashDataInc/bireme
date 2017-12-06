@@ -187,9 +187,13 @@ public class Config {
    * @throws BiremeException miss some required configuration
    */
   protected void fetchDebeziumConfig(SourceConfig debeziumConf) throws BiremeException {
-    String prefix = debeziumConf.name;
-    Configuration subConfig = new SubsetConfiguration(config, prefix, ".");
-
+    Configuration subConfig = new SubsetConfiguration(config, debeziumConf.name, ".");
+    String prefix = subConfig.getString("namespace");
+    if (prefix == null) {
+      String messages = "Please designate your namespace.";
+      logger.fatal(messages);
+      throw new BiremeException(messages);
+    }
     debeziumConf.type = SourceType.DEBEZIUM;
     debeziumConf.server = subConfig.getString("kafka.server");
     debeziumConf.topic = prefix;
