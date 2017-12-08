@@ -156,10 +156,10 @@ public class Config {
 
     for (SourceConfig conf : sourceConfig.values()) {
       String type = config.getString(conf.name + ".type");
-      if(type == null){
-    	  	String message = "Please designate the data source type of "+ conf.name;
-    	  	logger.fatal(message);
-    	  	throw new BiremeException(message);
+      if (type == null) {
+        String message = "Please designate the data source type of " + conf.name;
+        logger.fatal(message);
+        throw new BiremeException(message);
       }
 
       switch (type) {
