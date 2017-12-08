@@ -156,6 +156,11 @@ public class Config {
 
     for (SourceConfig conf : sourceConfig.values()) {
       String type = config.getString(conf.name + ".type");
+      if(type == null){
+    	  	String message = "Please designate the data source type of "+ conf.name;
+    	  	logger.fatal(message);
+    	  	throw new BiremeException(message);
+      }
 
       switch (type) {
         case "maxwell":
@@ -187,8 +192,14 @@ public class Config {
    * @throws BiremeException miss some required configuration
    */
   protected void fetchDebeziumConfig(SourceConfig debeziumConf) throws BiremeException {
-    String prefix = debeziumConf.name;
-    Configuration subConfig = new SubsetConfiguration(config, prefix, ".");
+    Configuration subConfig = new SubsetConfiguration(config, debeziumConf.name, ".");
+
+    String prefix = subConfig.getString("namespace");
+    if (prefix == null) {
+      String messages = "Please designate your namespace.";
+      logger.fatal(messages);
+      throw new BiremeException(messages);
+    }
 
     debeziumConf.type = SourceType.DEBEZIUM;
     debeziumConf.server = subConfig.getString("kafka.server");
@@ -196,7 +207,7 @@ public class Config {
     debeziumConf.groupID = subConfig.getString("kafka.groupid", "bireme");
 
     if (debeziumConf.server == null) {
-      String message = "Please designate server for " + prefix + ".";
+      String message = "Please designate server for " + debeziumConf.name + ".";
       logger.fatal(message);
       throw new BiremeException(message);
     }
