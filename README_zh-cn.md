@@ -86,7 +86,7 @@ Bireme 从数据源读取数据 (Record)，将其转化为内部格式 (Row) 并
 |参数|描述|
 |:---:|:---:|
 |\<source_name\>.kafka.server|数据源的 Kafka 地址，格式:  <br>\<ip\>:\<port\>|
-|\<source_name\>.kafka.namespace|
+|\<source_name\>.kafka.namespace|数据源 debezium 的名字|
 
 
 **其它参数**
