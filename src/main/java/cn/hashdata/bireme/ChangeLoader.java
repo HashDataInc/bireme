@@ -171,6 +171,12 @@ public class ChangeLoader implements Callable<Long> {
    */
   protected Connection getConnection() throws BiremeException {
     Connection connection = cxt.loaderConnections.poll();
+    if (connection == null) {
+      String message = "Unable to get Connection.";
+      logger.fatal(message);
+      throw new BiremeException(message);
+    }
+
     HashSet<String> temporaryTables = cxt.temporaryTables.get(connection);
 
     if (!temporaryTables.contains(mappedTable)) {

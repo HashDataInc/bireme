@@ -90,6 +90,7 @@ The configuration files consist of two parts:
 |:---:|:---:|
 |\<source_name\>.kafka.server|Kafka address. Format:<br>\<ip\>:\<port\>|
 |\<source_name\>.kafka.groupid|Kafka consumer group id. Default value is *bireme*|
+|\<source_name\>.kafka.namespace|Debezium's name.|
 
 **Other parameters**
 
