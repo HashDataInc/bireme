@@ -110,7 +110,7 @@ public class ChangeLoader implements Callable<Long> {
       // get connection
       conn = getConnection();
       if (conn == null) {
-        logger.warn("Unable to get Connection.");
+        logger.debug("Unable to get Connection.");
         break;
       }
 
@@ -220,8 +220,6 @@ public class ChangeLoader implements Callable<Long> {
         if (cxt.stop) {
           conn.rollback();
           return;
-        } else {
-          conn.commit();
         }
       } catch (SQLException e) {
         String message = cxt.stop ? "Rollback failed\n" : "Commit failed\n";
@@ -238,14 +236,19 @@ public class ChangeLoader implements Callable<Long> {
         if (cxt.stop) {
           conn.rollback();
           return;
-        } else {
-          conn.commit();
         }
       } catch (SQLException e) {
         String message = cxt.stop ? "Rollback failed" : "Commit failed";
         throw new BiremeException(message, e);
       }
     }
+
+    try {
+		conn.commit();
+	} catch (SQLException e) {
+		String message = "commit failed.";
+		throw new BiremeException(message ,e);
+	}
 
     for (CommitCallback callback : currentTask.callbacks) {
       callback.done();
