@@ -244,11 +244,11 @@ public class ChangeLoader implements Callable<Long> {
     }
 
     try {
-		conn.commit();
-	} catch (SQLException e) {
-		String message = "commit failed.";
-		throw new BiremeException(message ,e);
-	}
+      conn.commit();
+    } catch (SQLException e) {
+      String message = "commit failed.";
+      throw new BiremeException(message, e);
+    }
 
     for (CommitCallback callback : currentTask.callbacks) {
       callback.done();
