@@ -80,12 +80,14 @@ Bireme 从数据源读取数据 (Record)，将其转化为内部格式 (Row) 并
 |:---:|:---:|
 |\<source_name\>.kafka.server|数据源的 Kafka 地址，格式:  <br>\<ip\>:\<port\>|
 |\<source_name\>.kafka.topic|数据源在 Kafka 中对应的 topic|
+|\<source_name\>.kafka.groupid|消费者 group id, 默认值是 *bireme*|
 
 **Debezium 数据源参数**
 
 |参数|描述|
 |:---:|:---:|
 |\<source_name\>.kafka.server|数据源的 Kafka 地址，格式:  <br>\<ip\>:\<port\>|
+|\<source_name\>.kafka.groupid|消费者 group id, 默认值是 *bireme*|
 |\<source_name\>.kafka.namespace|数据源 debezium 的名字|
 
 
