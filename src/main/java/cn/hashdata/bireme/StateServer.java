@@ -115,12 +115,16 @@ public class StateServer {
     @Override
     public void handle(String target, Request baseRequest, HttpServletRequest request,
         HttpServletResponse response) throws IOException, ServletException {
-      response.setContentType("text/html; charset=utf-8");
-      response.setStatus(HttpServletResponse.SC_OK);
+      response.setContentType("application/json; charset=utf-8");
+      if (target.compareTo("/") != 0 && this.source == null) {
+        response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+      } else {
+        response.setStatus(HttpServletResponse.SC_OK);
 
-      PrintWriter out = response.getWriter();
-      String format = request.getParameter("pretty");
-      out.println(fetchState(format));
+        PrintWriter out = response.getWriter();
+        String format = request.getParameter("pretty");
+        out.println(fetchState(format));
+      }
 
       baseRequest.setHandled(true);
     }
