@@ -5,6 +5,7 @@ import java.util.HashMap;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.logging.log4j.LogManager;
 
 import com.google.gson.JsonObject;
@@ -27,7 +28,8 @@ import cn.hashdata.bireme.Row.RowType;
 public class MaxwellPipeLine extends KafkaPipeLine {
   public MaxwellPipeLine(Context cxt, SourceConfig conf, int partitionID) {
     super(cxt, conf, "Maxwell-" + conf.name + "-" + conf.topic + "-" + partitionID);
-    consumer.subscribe(Arrays.asList(conf.topic));
+    consumer.assign(Arrays.asList(new TopicPartition(conf.topic, partitionID)));
+
     logger = LogManager.getLogger("Bireme." + myName);
     logger.info("Create new Maxwell Pipeline. Name: {}", myName);
   }
