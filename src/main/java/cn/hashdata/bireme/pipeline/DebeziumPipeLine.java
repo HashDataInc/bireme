@@ -37,8 +37,13 @@ import cn.hashdata.bireme.Row.RowType;
  *
  */
 public class DebeziumPipeLine extends KafkaPipeLine {
+  public SourceConfig conf;
+
   public DebeziumPipeLine(Context cxt, SourceConfig conf, String topic) {
     super(cxt, conf, "Debezium-" + conf.name + "-" + topic);
+
+    this.conf = conf;
+
     List<TopicPartition> topicPartition =
         consumer.partitionsFor(topic)
             .stream()
@@ -65,7 +70,9 @@ public class DebeziumPipeLine extends KafkaPipeLine {
     }
 
     private String getMappedTableName(DebeziumRecord record) {
-      return cxt.tableMap.get(record.topic);
+      String DataSource = conf.name + record.topic.substring(record.topic.indexOf("."));
+
+      return cxt.tableMap.get(DataSource);
     }
 
     private String getOriginTableName(DebeziumRecord record) {
