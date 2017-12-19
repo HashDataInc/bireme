@@ -191,7 +191,8 @@ public class Bireme implements Daemon {
 
         case DEBEZIUM:
           for (String sourceTable : conf.tableMap.keySet()) {
-            PipeLine pipeLine = new DebeziumPipeLine(cxt, conf, sourceTable);
+            String topic = conf.topic + sourceTable.substring(sourceTable.indexOf("."));
+            PipeLine pipeLine = new DebeziumPipeLine(cxt, conf, topic);
             cxt.pipeLines.add(pipeLine);
             conf.pipeLines.add(pipeLine);
           }

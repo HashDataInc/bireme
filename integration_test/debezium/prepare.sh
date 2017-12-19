@@ -11,7 +11,7 @@ CONNECTOR_CONFIG='
         "database.user": "postgres",
         "database.password": "postgres",
         "database.dbname": "postgres",
-        "database.server.name": "debezium_CI"
+        "database.server.name": "hashdata"
     }
 }'
 
