@@ -162,7 +162,7 @@ public class Bireme implements Daemon {
         }
       }
 
-      throw new BiremeException("Could not establish connection to target database.\n", e);
+      throw new BiremeException("Could not establish connection to target database.", e);
     }
 
     logger.info("Finishing establishing {} connections for loaders.", cxt.conf.loader_conn_size);

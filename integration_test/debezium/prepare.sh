@@ -17,6 +17,7 @@ CONNECTOR_CONFIG='
 
 $DOCKER_RUN --name Zookeeper -p 2181:2181 -p 2888:2888 -p 3888:3888 -d debezium/zookeeper:0.5
 $DOCKER_RUN --name Kafka -p 9092:9092 \
+            -e ADVERTISED_HOST_NAME=192.168.3.33 \
             -e ZOOKEEPER_CONNECT=Zookeeper:2181 \
             --link Zookeeper:Zookeeper -d debezium/kafka:0.5
 $DOCKER_RUN --name Postgres -p 5432:5432 -d debezium/postgres:latest
