@@ -5,6 +5,7 @@ import java.math.BigInteger;
 import java.sql.Types;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -37,14 +38,19 @@ import cn.hashdata.bireme.Row.RowType;
  *
  */
 public class DebeziumPipeLine extends KafkaPipeLine {
+  public SourceConfig conf;
+
   public DebeziumPipeLine(Context cxt, SourceConfig conf, String topic) {
     super(cxt, conf, "Debezium-" + conf.name + "-" + topic);
+
+    this.conf = conf;
+
     List<TopicPartition> topicPartition =
         consumer.partitionsFor(topic)
             .stream()
             .map(p -> new TopicPartition(p.topic(), p.partition()))
             .collect(Collectors.toList());
-    consumer.assign(topicPartition);
+    consumer.subscribe(Arrays.asList(topic));
 
     logger = LogManager.getLogger("Bireme." + myName);
     logger.info("Create new Debezium PipeLine. Name: {}", myName);
@@ -65,7 +71,9 @@ public class DebeziumPipeLine extends KafkaPipeLine {
     }
 
     private String getMappedTableName(DebeziumRecord record) {
-      return cxt.tableMap.get(record.topic);
+      String dataSource = conf.name + record.topic.substring(record.topic.indexOf("."));
+
+      return cxt.tableMap.get(dataSource);
     }
 
     private String getOriginTableName(DebeziumRecord record) {
