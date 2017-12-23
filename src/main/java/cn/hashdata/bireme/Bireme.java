@@ -183,7 +183,7 @@ public class Bireme implements Daemon {
           Iterator<PartitionInfo> iter = consumer.partitionsFor(conf.topic).iterator();
 
           while (iter.hasNext()) {
-            PipeLine pipeLine = new MaxwellPipeLine(cxt, conf);
+            PipeLine pipeLine = new MaxwellPipeLine(cxt, conf, iter.next().partition());
             cxt.pipeLines.add(pipeLine);
             conf.pipeLines.add(pipeLine);
           }
