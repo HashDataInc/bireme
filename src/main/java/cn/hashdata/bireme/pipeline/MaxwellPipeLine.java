@@ -25,8 +25,8 @@ import cn.hashdata.bireme.Row.RowType;
  *
  */
 public class MaxwellPipeLine extends KafkaPipeLine {
-  public MaxwellPipeLine(Context cxt, SourceConfig conf, int partitionID) {
-    super(cxt, conf, "Maxwell-" + conf.name + "-" + conf.topic + "-" + partitionID);
+  public MaxwellPipeLine(Context cxt, SourceConfig conf) {
+    super(cxt, conf, "Maxwell-" + conf.name + "-" + conf.topic);
     consumer.subscribe(Arrays.asList(conf.topic));
     logger = LogManager.getLogger("Bireme." + myName);
     logger.info("Create new Maxwell Pipeline. Name: {}", myName);

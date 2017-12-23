@@ -56,7 +56,7 @@ public class DebeziumPipeLine extends KafkaPipeLine {
     logger.info("Create new Debezium PipeLine. Name: {}", myName);
 
     if (topicPartition.size() > 1) {
-      logger.warn("Topic {} has {} partitions", topic, topicPartition.size());
+      logger.error("Topic {} has {} partitions", topic, topicPartition.size());
     }
   }
 
