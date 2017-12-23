@@ -162,7 +162,7 @@ public class Bireme implements Daemon {
         }
       }
 
-      throw new BiremeException("Could not establish connection to target database.\n", e);
+      throw new BiremeException("Could not establish connection to target database.", e);
     }
 
     logger.info("Finishing establishing {} connections for loaders.", cxt.conf.loader_conn_size);
@@ -183,7 +183,7 @@ public class Bireme implements Daemon {
           Iterator<PartitionInfo> iter = consumer.partitionsFor(conf.topic).iterator();
 
           while (iter.hasNext()) {
-            PipeLine pipeLine = new MaxwellPipeLine(cxt, conf, iter.next().partition());
+            PipeLine pipeLine = new MaxwellPipeLine(cxt, conf);
             cxt.pipeLines.add(pipeLine);
             conf.pipeLines.add(pipeLine);
           }
@@ -191,7 +191,8 @@ public class Bireme implements Daemon {
 
         case DEBEZIUM:
           for (String sourceTable : conf.tableMap.keySet()) {
-            PipeLine pipeLine = new DebeziumPipeLine(cxt, conf, sourceTable);
+            String topic = conf.topic + sourceTable.substring(sourceTable.indexOf("."));
+            PipeLine pipeLine = new DebeziumPipeLine(cxt, conf, topic);
             cxt.pipeLines.add(pipeLine);
             conf.pipeLines.add(pipeLine);
           }

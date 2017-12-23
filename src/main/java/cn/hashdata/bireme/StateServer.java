@@ -118,6 +118,12 @@ public class StateServer {
       response.setContentType("application/json; charset=utf-8");
       if (target.compareTo("/") != 0 && this.source == null) {
         response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+
+        Gson gson = new Gson();
+        Message message = new Message("the datasource is not found");
+        String format = gson.toJson(message);
+        PrintWriter out = response.getWriter();
+        out.println(format);
       } else {
         response.setStatus(HttpServletResponse.SC_OK);
 
@@ -200,6 +206,13 @@ public class StateServer {
       this.source_name = source_name;
       this.type = type;
       pipelines = new ArrayList<Stat>();
+    }
+  }
+  class Message {
+    String errorMessage;
+
+    public Message(String errorMessage) {
+      this.errorMessage = errorMessage;
     }
   }
 }
