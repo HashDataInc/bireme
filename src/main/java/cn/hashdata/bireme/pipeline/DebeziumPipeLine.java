@@ -40,7 +40,7 @@ import cn.hashdata.bireme.Row.RowType;
 public class DebeziumPipeLine extends KafkaPipeLine {
   public SourceConfig conf;
 
-  public DebeziumPipeLine(Context cxt, SourceConfig conf, String topic) {
+  public DebeziumPipeLine(Context cxt, SourceConfig conf, String topic) throws BiremeException {
     super(cxt, conf, "Debezium-" + conf.name + "-" + topic);
 
     this.conf = conf;
@@ -57,6 +57,8 @@ public class DebeziumPipeLine extends KafkaPipeLine {
 
     if (topicPartition.size() > 1) {
       logger.error("Topic {} has {} partitions", topic, topicPartition.size());
+      String message = "Topic has more than one partitions";
+      throw new BiremeException(message);
     }
   }
 
