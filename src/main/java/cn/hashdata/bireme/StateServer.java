@@ -174,7 +174,7 @@ public class StateServer {
       Source e = new Source(conf.name, conf.type.toString());
 
       for (PipeLine p : conf.pipeLines) {
-        String name = p.myName.split("-",3)[2];
+        String name = p.myName.split("-", 3)[2];
         PipeLineStat stat = p.stat;
         Date latest = new Date(stat.newestCompleted);
         long delay = stat.delay;

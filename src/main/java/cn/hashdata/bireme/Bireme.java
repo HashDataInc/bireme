@@ -174,7 +174,7 @@ public class Bireme implements Daemon {
     }
   }
 
-  protected void createPipeLine() {
+  protected void createPipeLine() throws BiremeException {
     for (SourceConfig conf : cxt.conf.sourceConfig.values()) {
       switch (conf.type) {
         case MAXWELL:
@@ -182,8 +182,11 @@ public class Bireme implements Daemon {
               KafkaPipeLine.createConsumer(conf.server, conf.groupID);
           Iterator<PartitionInfo> iter = consumer.partitionsFor(conf.topic).iterator();
 
+          int num = 0;
           while (iter.hasNext()) {
-            PipeLine pipeLine = new MaxwellPipeLine(cxt, conf, iter.next().partition());
+            iter.next();
+            num++;
+            PipeLine pipeLine = new MaxwellPipeLine(cxt, conf, num);
             cxt.pipeLines.add(pipeLine);
             conf.pipeLines.add(pipeLine);
           }
