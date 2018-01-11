@@ -1,5 +1,43 @@
 # Bireme tpcc 测试
 
+### tpcc client 的准备
+
+* **tpcc 主机准备**
+
+  * 在 QingCloud 上启动主机，选择配置 4core2G
+
+  * 下载并编译 tpcc-mysql
+```
+git clone https://github.com/Percona-Lab/tpcc-mysql.git
+cd tpcc-mysql/src
+make
+```
+
+* **启动 mysql**
+
+在 QingCloud 上启动 MySQL Plus 服务，选择配置 8core16G * 3 nodes, 100G/node
+
+
+* **修改脚本配置**
+
+将 bireme_tpcc_test 目录下的 init.sh 和 parallel_load.sh 脚本复制到 tpcc-mysql 目录下
+
+|配置项|解释|默认值|
+|:---:|:---:|:---:|
+|MYSQL|MySQL 的 IP 地址|必须指定|
+|USER|MySQL 的用户名|必须指定|
+|PW|MySQL 的密码|必须指定|
+|WH|Warehouse 数量|500|
+|STEP|每个并发线程负责加载的 Warehouse 数量|100|
+
+
+```
+./init.sh
+./parallel_load.sh
+```
+
+更多关于 tpcc-mysql 的配置与使用，参考 [tpcc-mysql](https://www.hi-linux.com/posts/38534.html)。
+
 ### Kafka 的准备
 在 kafka 新建一个 topic，命名为 maxwell，可以根据实际情况指定 partition 的个数。
 
