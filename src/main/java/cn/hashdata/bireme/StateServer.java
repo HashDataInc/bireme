@@ -197,13 +197,13 @@ public class StateServer {
     String name;
     Date latest;
     double delay;
-    String pipelinestate;
+    String state;
 
-    public Stat(String name, Date latest, long delay, String pipelinestate) {
+    public Stat(String name, Date latest, long delay, String state) {
       this.name = name;
       this.latest = latest;
       this.delay = delay / 1000.0;
-      this.pipelinestate = pipelinestate;
+      this.state = state;
     }
   }
   class Source {
