@@ -145,12 +145,14 @@ HTTP 服务器提供了下列端点:
     {
       "name": "XXXXXX",
       "latest": "yyyy-MM-ddTHH:mm:ss.SSSZ",
-      "delay": XX.XXX
+      "delay": XX.XXX,
+      "state": "XXXXX"
     },
     {
       "name": "XXXXXX",
       "latest": "yyyy-MM-ddTHH:mm:ss.SSSZ",
-      "delay": XX.XXX
+      "delay": XX.XXX,
+      "state": "XXXXX"
     },
   ]
 }
@@ -162,6 +164,7 @@ HTTP 服务器提供了下列端点:
  - *name* 是 pipeline 的名称.
  - *latest* 是成功被同步到 hashdata 中，最新的 change data 产生时间。
  - *delay* 是从 change data 进入到成功加载并通知给数据的时间间隔。
+ - *state*是pipeline的状态
 
 ## 1.6 参考
 

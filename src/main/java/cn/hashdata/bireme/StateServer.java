@@ -21,6 +21,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import cn.hashdata.bireme.pipeline.PipeLine;
+import cn.hashdata.bireme.pipeline.PipeLine.PipeLineState;
 import cn.hashdata.bireme.pipeline.SourceConfig;
 
 import org.eclipse.jetty.server.Request;
@@ -178,8 +179,14 @@ public class StateServer {
         PipeLineStat stat = p.stat;
         Date latest = new Date(stat.newestCompleted);
         long delay = stat.delay;
+        String pipelinestate = "NORMAL";
+        if (p.state == PipeLineState.STOP) {
+          pipelinestate = "STOP";
+        } else if (p.state == PipeLineState.ERROR) {
+          pipelinestate = "ERROR";
+        }
 
-        e.pipelines.add(new Stat(name, latest, delay));
+        e.pipelines.add(new Stat(name, latest, delay, pipelinestate));
       }
 
       return e;
@@ -190,11 +197,13 @@ public class StateServer {
     String name;
     Date latest;
     double delay;
+    String state;
 
-    public Stat(String name, Date latest, long delay) {
+    public Stat(String name, Date latest, long delay, String state) {
       this.name = name;
       this.latest = latest;
       this.delay = delay / 1000.0;
+      this.state = state;
     }
   }
   class Source {
