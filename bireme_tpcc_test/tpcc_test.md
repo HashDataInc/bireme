@@ -30,6 +30,7 @@ make
 |WH|Warehouse 数量|500|
 |STEP|每个并发线程负责加载的 Warehouse 数量|100|
 
+* **执行脚本**
 
 ```
 ./init.sh
