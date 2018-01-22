@@ -315,6 +315,7 @@ public class ChangeLoader implements Callable<Long> {
     long copyCount = -1L;
     PipedOutputStream pipeOut = new PipedOutputStream();
     PipedInputStream pipeIn = null;
+    BiremeException temp = null;
 
     try {
       pipeIn = new PipedInputStream(pipeOut);
@@ -325,7 +326,11 @@ public class ChangeLoader implements Callable<Long> {
     String sql = getCopySql(tableName, columnList);
     copyResult = copyThread.submit(new TupleCopyer(pipeIn, sql, conn));
 
-    tupleWriter(pipeOut, tuples);
+    try {
+      tupleWriter(pipeOut, tuples);
+    } catch (BiremeException e) {
+      temp = e;
+    }
 
     try {
       while (!copyResult.isDone() && !cxt.stop) {
@@ -339,6 +344,10 @@ public class ChangeLoader implements Callable<Long> {
       copyCount = copyResult.get();
     } catch (ExecutionException e) {
       throw new BiremeException("Copy failed.", e.getCause());
+    }
+
+    if (temp != null) {
+      throw temp;
     }
 
     return copyCount;
