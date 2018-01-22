@@ -164,7 +164,7 @@ The following is an example of Load State:
  - *name* is the pipeline's name.
  - *latest* is produce time of latest change data that have been successfully loaded to hashdata.
  - *delay* is the time period for change data from entering bireme to being committed to data source.
- - *state* is the pipeline's name.
+ - *state* is the pipeline's state.
 
 ## 1.6 Reference
 
