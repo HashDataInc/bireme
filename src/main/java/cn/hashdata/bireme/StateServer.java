@@ -182,7 +182,7 @@ public class StateServer {
         String pipelinestate = "NORMAL";
         if (p.state == PipeLineState.ERROR) {
           pipelinestate = "ERROR";
-        } 
+        }
 
         e.pipelines.add(new Stat(name, latest, delay, pipelinestate));
       }
