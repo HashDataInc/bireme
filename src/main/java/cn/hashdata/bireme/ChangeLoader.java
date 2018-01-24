@@ -214,33 +214,12 @@ public class ChangeLoader implements Callable<Long> {
 
         logger.info("Chang to optimistic mode.");
       }
-
-      // After delete, commit
-      try {
-        if (cxt.stop) {
-          conn.rollback();
-          return;
-        }
-      } catch (SQLException e) {
-        String message = cxt.stop ? "Rollback failed\n" : "Commit failed\n";
-        throw new BiremeException(message, e);
-      }
     }
 
     if (!currentTask.insert.isEmpty()) {
       HashSet<String> insertSet = new HashSet<String>();
       insertSet.addAll(currentTask.insert.values());
       executeInsert(insertSet);
-
-      try {
-        if (cxt.stop) {
-          conn.rollback();
-          return;
-        }
-      } catch (SQLException e) {
-        String message = cxt.stop ? "Rollback failed" : "Commit failed";
-        throw new BiremeException(message, e);
-      }
     }
 
     try {
@@ -263,10 +242,6 @@ public class ChangeLoader implements Callable<Long> {
     timerCTX = copyForDeleteTimer.time();
     copyWorker(temporaryTableName, keyNames, delete);
     timerCTX.stop();
-
-    if (cxt.stop) {
-      return 0L;
-    }
 
     timerCTX = deleteTimer.time();
     deleteCounts = deleteWorker(mappedTable, temporaryTableName, keyNames);
@@ -335,10 +310,6 @@ public class ChangeLoader implements Callable<Long> {
     try {
       while (!copyResult.isDone() && !cxt.stop) {
         Thread.sleep(1);
-      }
-
-      if (cxt.stop) {
-        return 0L;
       }
 
       copyCount = copyResult.get();
