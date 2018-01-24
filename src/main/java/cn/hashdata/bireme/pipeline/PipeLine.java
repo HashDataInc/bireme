@@ -37,13 +37,13 @@ import cn.hashdata.bireme.Table;
  *
  */
 public abstract class PipeLine implements Callable<PipeLine> {
-  public enum PipeLineState { NORMAL, ERROR }
+  public enum PipeLineState { NORMAL, ERROR, STOP }
 
   public Logger logger;
 
   public String myName;
   public volatile PipeLineState state;
-  public BiremeException e;
+  public Exception e;
   public PipeLineStat stat;
 
   public Context cxt;
@@ -83,6 +83,20 @@ public abstract class PipeLine implements Callable<PipeLine> {
 
   @Override
   public PipeLine call() {
+    try {
+      executePipeline();
+    } catch (Exception e) {
+      state = PipeLineState.ERROR;
+      this.e = e;
+
+      logger.error("Execute Pipeline failed: {}", e.getMessage());
+      logger.error("Stack Trace: ", e);
+    }
+
+    return this;
+  }
+
+  private PipeLine executePipeline() {
     // Poll data and start transformer
     while (transResult.remainingCapacity() != 0) {
       ChangeSet changeSet = null;
