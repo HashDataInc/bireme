@@ -12,7 +12,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import cn.hashdata.bireme.pipeline.PipeLine;
-import cn.hashdata.bireme.pipeline.PipeLine.PipeLineState;
 
 /**
  * {@code Scheduler} collects all {@code PipeLine}. Successively and constantly drive the
@@ -57,9 +56,6 @@ public class Scheduler implements Callable<Long> {
             workingPipeLine++;
             break;
           case ERROR:
-            pipeLine.state = PipeLineState.STOP;
-            break;
-          case STOP:
           default:
         }
       }
