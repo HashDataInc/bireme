@@ -37,7 +37,7 @@ import cn.hashdata.bireme.Table;
  *
  */
 public abstract class PipeLine implements Callable<PipeLine> {
-  public enum PipeLineState { NORMAL, ERROR, STOP }
+  public enum PipeLineState { NORMAL, ERROR }
 
   public Logger logger;
 

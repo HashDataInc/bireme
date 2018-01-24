@@ -180,11 +180,9 @@ public class StateServer {
         Date latest = new Date(stat.newestCompleted);
         long delay = stat.delay;
         String pipelinestate = "NORMAL";
-        if (p.state == PipeLineState.STOP) {
-          pipelinestate = "STOP";
-        } else if (p.state == PipeLineState.ERROR) {
+        if (p.state == PipeLineState.ERROR) {
           pipelinestate = "ERROR";
-        }
+        } 
 
         e.pipelines.add(new Stat(name, latest, delay, pipelinestate));
       }
