@@ -21,6 +21,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.Logger;
@@ -77,7 +78,13 @@ public class ChangeLoader implements Callable<Long> {
     this.mappedTable = mappedTable;
     this.table = cxt.tablesInfo.get(mappedTable);
     this.taskIn = taskIn;
-    this.copyThread = Executors.newFixedThreadPool(1);
+    this.copyThread = Executors.newFixedThreadPool(1, new ThreadFactory() {
+      public Thread newThread(Runnable r) {
+        Thread t = Executors.defaultThreadFactory().newThread(r);
+        t.setDaemon(true);
+        return t;
+      }
+    });
 
     // add statistics
     Timer[] timers = pipeLine.stat.addTimerForLoader(mappedTable);
