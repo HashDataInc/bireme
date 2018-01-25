@@ -97,27 +97,26 @@ public abstract class PipeLine implements Callable<PipeLine> {
   }
 
   private PipeLine executePipeline() {
-    PipeLine temp = null;
-    temp = transData(); // Poll data and start transformer
-    if (temp != null) {
-      return temp;
+    // Poll data and start transformer
+    if (transData() == false) {
+      return this;
     }
 
-    temp = startDispatch(); // Start dispatcher, only one dispatcher for each pipeline
-    if (temp != null) {
-      return temp;
+    // Start dispatcher, only one dispatcher for each pipeline
+    if (startDispatch() == false) {
+      return this;
     }
 
-    temp = startMerge(); // Start merger
-    if (temp != null) {
-      return temp;
+    // Start merger
+    if (startMerge() == false) {
+      return this;
     }
 
     checkAndCommit(); // Commit result
     return this;
   }
 
-  private PipeLine transData() {
+  private boolean transData() {
     while (transResult.remainingCapacity() != 0) {
       ChangeSet changeSet = null;
 
@@ -130,7 +129,7 @@ public abstract class PipeLine implements Callable<PipeLine> {
         logger.error("Poll change set failed. Message: {}", e.getMessage());
         logger.error("Stack Trace: ", e);
 
-        return this;
+        return false;
       }
 
       if (changeSet == null) {
@@ -143,10 +142,10 @@ public abstract class PipeLine implements Callable<PipeLine> {
       localTransformer.add(trans);
     }
 
-    return null;
+    return true;
   }
 
-  private PipeLine startDispatch() {
+  private boolean startDispatch() {
     try {
       dispatcher.dispatch();
     } catch (BiremeException e) {
@@ -156,7 +155,7 @@ public abstract class PipeLine implements Callable<PipeLine> {
       logger.error("Dispatch failed. Message: {}", e.getMessage());
       logger.error("Stack Trace: ", e);
 
-      return this;
+      return false;
 
     } catch (InterruptedException e) {
       state = PipeLineState.ERROR;
@@ -165,13 +164,13 @@ public abstract class PipeLine implements Callable<PipeLine> {
       logger.info("Interrupted when getting transform result. Message: {}.", e.getMessage());
       logger.info("Stack Trace: ", e);
 
-      return this;
+      return false;
     }
 
-    return null;
+    return true;
   }
 
-  private PipeLine startMerge() {
+  private boolean startMerge() {
     for (RowCache rowCache : cache.values()) {
       if (rowCache.shouldMerge()) {
         rowCache.startMerge();
@@ -187,7 +186,7 @@ public abstract class PipeLine implements Callable<PipeLine> {
         logger.info("Loader for {} failed. Message: {}.", rowCache.tableName, e.getMessage());
         logger.info("Stack Trace: ", e);
 
-        return this;
+        return false;
 
       } catch (InterruptedException e) {
         state = PipeLineState.ERROR;
@@ -197,11 +196,11 @@ public abstract class PipeLine implements Callable<PipeLine> {
             rowCache.tableName, e.getMessage());
         logger.info("Stack Trace: ", e);
 
-        return this;
+        return false;
       }
     }
 
-    return null;
+    return true;
   }
 
   /**
