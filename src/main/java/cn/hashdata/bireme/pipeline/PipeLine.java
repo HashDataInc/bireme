@@ -97,7 +97,27 @@ public abstract class PipeLine implements Callable<PipeLine> {
   }
 
   private PipeLine executePipeline() {
-    // Poll data and start transformer
+    PipeLine temp = null;
+    temp = transData(); // Poll data and start transformer
+    if (temp != null) {
+      return temp;
+    }
+
+    temp = startDispatch(); // Start dispatcher, only one dispatcher for each pipeline
+    if (temp != null) {
+      return temp;
+    }
+
+    temp = startMerge(); // Start merger
+    if (temp != null) {
+      return temp;
+    }
+
+    checkAndCommit(); // Commit result
+    return this;
+  }
+
+  private PipeLine transData() {
     while (transResult.remainingCapacity() != 0) {
       ChangeSet changeSet = null;
 
@@ -123,7 +143,10 @@ public abstract class PipeLine implements Callable<PipeLine> {
       localTransformer.add(trans);
     }
 
-    // Start dispatcher, only one dispatcher for each pipeline
+    return null;
+  }
+
+  private PipeLine startDispatch() {
     try {
       dispatcher.dispatch();
     } catch (BiremeException e) {
@@ -145,7 +168,10 @@ public abstract class PipeLine implements Callable<PipeLine> {
       return this;
     }
 
-    // Start merger
+    return null;
+  }
+
+  private PipeLine startMerge() {
     for (RowCache rowCache : cache.values()) {
       if (rowCache.shouldMerge()) {
         rowCache.startMerge();
@@ -175,9 +201,7 @@ public abstract class PipeLine implements Callable<PipeLine> {
       }
     }
 
-    // Commit result
-    checkAndCommit();
-    return this;
+    return null;
   }
 
   /**
