@@ -10,6 +10,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.InterruptException;
 
 import com.codahale.metrics.Timer;
 
@@ -41,9 +42,14 @@ public abstract class KafkaPipeLine extends PipeLine {
 
   @Override
   public ChangeSet pollChangeSet() throws BiremeException {
-    ConsumerRecords<String, String> records = consumer.poll(POLL_TIMEOUT);
+    ConsumerRecords<String, String> records = null;
 
-    if (cxt.stop || records.isEmpty()) {
+    try {
+      records = consumer.poll(POLL_TIMEOUT);
+    } catch (InterruptException e) {
+    }
+
+    if (cxt.stop || records == null || records.isEmpty()) {
       return null;
     }
 
