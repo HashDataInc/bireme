@@ -131,7 +131,7 @@ public class MaxwellPipeLine extends KafkaPipeLine {
         this.dataSource = getPipeLineName();
         this.database = value.get("database").getAsString();
         this.table = value.get("table").getAsString();
-        this.produceTime = value.get("ts").getAsLong();
+        this.produceTime = value.get("ts").getAsLong() * 1000;
         this.data = value.get("data").getAsJsonObject();
 
         if (value.has("old") && !value.get("old").isJsonNull()) {
