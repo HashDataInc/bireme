@@ -10,6 +10,7 @@ import java.io.PipedOutputStream;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -131,6 +132,24 @@ public class ChangeLoader implements Callable<Long> {
         try {
           conn.rollback();
           conn.close();
+          cxt.temporaryTables.remove(conn);
+
+          Connection newCon = BiremeUtility.jdbcConn(cxt.conf.targetDatabase);
+          newCon.setAutoCommit(true);
+          Statement stmt = newCon.createStatement();
+
+          stmt.execute("set enable_nestloop = on;");
+          stmt.execute("set enable_seqscan = off;");
+          stmt.execute("set enable_hashjoin = off;");
+
+          try {
+            stmt.execute("set gp_autostats_mode = none;");
+          } catch (SQLException ignore) {
+          }
+
+          newCon.setAutoCommit(false);
+          cxt.loaderConnections.add(newCon);
+          cxt.temporaryTables.put(newCon, new HashSet<String>());
         } catch (Exception ignore) {
           logger.error("Fail to roll back after load exception. Message: {}", e.getMessage());
           throw e;
