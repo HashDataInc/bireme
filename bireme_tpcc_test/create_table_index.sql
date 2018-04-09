@@ -34,11 +34,11 @@ c_discount     decimal(4,4),
 c_credit       char(2),
 c_last         varchar(16),
 c_first        varchar(16),
-c_credit_lim   decimal(12,2),
+c_credit_lim   bigint,
 c_balance      decimal(12,2),
 c_ytd_payment  decimal(12,2),
-c_payment_cnt  integer,
-c_delivery_cnt integer,
+c_payment_cnt  smallint,
+c_delivery_cnt smallint,
 c_street_1     varchar(20),
 c_street_2     varchar(20),
 c_city         varchar(20),
@@ -47,7 +47,7 @@ c_zip          char(9),
 c_phone        char(16),
 c_since        timestamp,
 c_middle       char(2),
-c_data         varchar(500)
+c_data         text
 );
 create sequence bmsql_hist_id_seq;
 create table bmsql_history (
