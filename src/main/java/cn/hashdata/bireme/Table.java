@@ -4,14 +4,16 @@
 
 package cn.hashdata.bireme;
 
+import com.alibaba.fastjson.JSONObject;
+
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 
 /**
  * {@code Table} stores table's metadata acquired from database. Metadata includes:
@@ -29,20 +31,21 @@ import java.util.HashMap;
 public class Table {
   public int ncolumns;
   public ArrayList<String> columnName;
-  public ArrayList<String> keyNames;
   public HashMap<String, Integer> columnType;
   public HashMap<String, Integer> columnPrecision;
   public HashMap<String, Integer> columnScale;
+  public ArrayList<String> keyNames;
+  public ArrayList<Integer> keyIndexs;
 
   /**
    * Get metadata of a specific table using a given connection and construct a new {@code Table}.
    *
-   * @param schema The schema including table
-   * @param table Table name
-   * @param conn Connection to the database
+   * @param tableMap  Table name Map
+   * @param conn      Connection to the database
    * @throws BiremeException - Wrap and throw Exception which cannot be handled.
    */
-  public Table(String schema, String table, Connection conn) throws BiremeException {
+  public Table(String tableName, Map<String, JSONObject> tableMap, Connection conn)
+      throws BiremeException {
     this.ncolumns = 0;
     this.columnName = new ArrayList<String>();
     this.keyNames = new ArrayList<String>();
@@ -53,32 +56,17 @@ public class Table {
     Statement statement = null;
     ResultSet rs = null;
     ResultSetMetaData rsMetaData = null;
-    DatabaseMetaData dbMetaData = null;
 
     try {
-      dbMetaData = conn.getMetaData();
-
-      rs = dbMetaData.getTables(null, schema, table, new String[] {"TABLE"});
-      if (!rs.next()) {
-        String message = "Table " + schema + "." + table + " does no exist.";
-        throw new BiremeException(message);
-      }
-
-      rs = dbMetaData.getPrimaryKeys("", schema, table);
-      while (rs.next()) {
-        this.keyNames.add(rs.getString("COLUMN_NAME"));
-      }
-      if (this.keyNames.size() == 0) {
-        String message = "Table " + schema + "." + table + " has no primary key.";
-        throw new BiremeException(message);
-      }
+      this.keyIndexs.add(tableMap.get(tableName).getInteger("keyindexs"));
+      this.keyNames.add(tableMap.get(tableName).getString("column_name"));
 
       statement = conn.createStatement();
-      String queryTableInfo = "select * from " + schema + "." + table + " where 1=2";
+
+      String queryTableInfo = "select * from public." + tableName + " where 1=2";
       rs = statement.executeQuery(queryTableInfo);
       rsMetaData = rs.getMetaData();
       this.ncolumns = rsMetaData.getColumnCount();
-
       for (int i = 0, len = rsMetaData.getColumnCount(); i < len; i++) {
         String name = rsMetaData.getColumnName(i + 1);
         this.columnName.add(name);
@@ -91,7 +79,7 @@ public class Table {
         conn.close();
       } catch (SQLException ignore) {
       }
-      String message = "Could not get metadata for " + schema + "." + table + ".\n";
+      String message = "Could not get metadata for public. " + tableName + ".\n";
       throw new BiremeException(message, e);
     }
   }
