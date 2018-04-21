@@ -57,7 +57,7 @@ public class Bireme implements Daemon {
   private static final String DEFAULT_CONFIG_FILE = "etc/config.properties";
   private DaemonContext context;
   private Context cxt;
-
+  private static HashMap<String, String> tableMap;
   private Logger logger = LogManager.getLogger("Bireme");
 
   private ConsoleReporter consoleReporter;
@@ -106,13 +106,14 @@ public class Bireme implements Daemon {
     logger.info("Start getting metadata of target tables from target database.");
 
     Map<String, JSONObject> tableInfoMap = null;
+    tableMap = cxt.tableMap;
     String[] strArray;
     Connection conn = BiremeUtility.jdbcConn(cxt.conf.targetDatabase);
 
     try {
       tableInfoMap = GetPrimaryKeys.getPrimaryKeys(cxt.tableMap, conn);
     } catch (Exception e) {
-      String message = "error occurs by this way! ";
+      String message = "error occurs in this way! ";
       throw new BiremeException(message, e);
     }
 

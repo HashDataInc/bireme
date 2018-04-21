@@ -28,10 +28,12 @@ public class GetPrimaryKeys {
     String[] strArray;
     StringBuilder sb = new StringBuilder();
     sb.append("(");
+
     for (String fullname : tableMap.values()) {
       strArray = fullname.split("\\.");
       sb.append("'").append(strArray[1]).append("',");
     }
+
     String tableList = sb.toString().substring(0, sb.toString().length() - 1) + ")";
     String tableSql = "select tablename from pg_tables where schemaname='public' and tablename in "
         + tableList + "";

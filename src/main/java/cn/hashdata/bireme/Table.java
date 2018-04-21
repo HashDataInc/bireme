@@ -49,6 +49,7 @@ public class Table {
     this.ncolumns = 0;
     this.columnName = new ArrayList<String>();
     this.keyNames = new ArrayList<String>();
+    this.keyIndexs = new ArrayList<Integer>();
     this.columnType = new HashMap<String, Integer>();
     this.columnPrecision = new HashMap<String, Integer>();
     this.columnScale = new HashMap<String, Integer>();
@@ -58,9 +59,8 @@ public class Table {
     ResultSetMetaData rsMetaData = null;
 
     try {
-      this.keyIndexs.add(tableMap.get(tableName).getInteger("keyindexs"));
       this.keyNames.add(tableMap.get(tableName).getString("column_name"));
-
+      this.keyIndexs.add(tableMap.get(tableName).getInteger("keyindexs"));
       statement = conn.createStatement();
 
       String queryTableInfo = "select * from public." + tableName + " where 1=2";
