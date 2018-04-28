@@ -6,15 +6,14 @@ PG_SETUP=$(cat $SOURCE_DIR/pg_setup.sql)
 
 $DOCKER_RUN --name MySQL -p 3306:3306 \
             -e MYSQL_ROOT_PASSWORD=123456 \
-            -d mysql:latest \
+            -d mysql:5.7 \
             --server-id=1 --log-bin=master --binlog_format=row
 $DOCKER_RUN --name Postgres -p 5432:5432 -d postgres:latest
 $DOCKER_RUN --name Zookeeper -p 2181:2181 -d zookeeper:latest
 $DOCKER_RUN --name Kafka -p 9092:9092 \
             -e ZOOKEEPER_CONNECT=Zookeeper:2181 \
             --link Zookeeper:Zookeeper -d debezium/kafka:0.5
-
-until $(docker logs MySQL | grep -q "Server hostname (bind-address)")
+while $($MYSQL_EXEC -e "select 1;" | grep -q "ERROR")
 do
     sleep 1
 done

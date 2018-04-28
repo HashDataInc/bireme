@@ -12,6 +12,7 @@ import java.sql.Statement;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -31,6 +32,7 @@ import org.apache.kafka.common.PartitionInfo;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.alibaba.fastjson.JSONObject;
 import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.JmxReporter;
@@ -55,7 +57,7 @@ public class Bireme implements Daemon {
   private static final String DEFAULT_CONFIG_FILE = "etc/config.properties";
   private DaemonContext context;
   private Context cxt;
-
+  private static HashMap<String, String> tableMap;
   private Logger logger = LogManager.getLogger("Bireme");
 
   private ConsoleReporter consoleReporter;
@@ -103,8 +105,17 @@ public class Bireme implements Daemon {
   protected void getTableInfo() throws BiremeException {
     logger.info("Start getting metadata of target tables from target database.");
 
+    Map<String, JSONObject> tableInfoMap = null;
+    tableMap = cxt.tableMap;
     String[] strArray;
     Connection conn = BiremeUtility.jdbcConn(cxt.conf.targetDatabase);
+
+    try {
+      tableInfoMap = GetPrimaryKeys.getPrimaryKeys(cxt.tableMap, conn);
+    } catch (Exception e) {
+      String message = "error occurs in this way! ";
+      throw new BiremeException(message, e);
+    }
 
     for (String fullname : cxt.tableMap.values()) {
       if (cxt.tablesInfo.containsKey(fullname)) {
@@ -112,7 +123,7 @@ public class Bireme implements Daemon {
       }
 
       strArray = fullname.split("\\.");
-      cxt.tablesInfo.put(fullname, new Table(strArray[0], strArray[1], conn));
+      cxt.tablesInfo.put(fullname, new Table(strArray[1], tableInfoMap, conn));
     }
 
     try {
