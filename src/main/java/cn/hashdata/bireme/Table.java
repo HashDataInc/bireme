@@ -4,8 +4,6 @@
 
 package cn.hashdata.bireme;
 
-import com.alibaba.fastjson.JSONObject;
-
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -14,6 +12,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
 
 /**
  * {@code Table} stores table's metadata acquired from database. Metadata includes:
@@ -35,21 +34,20 @@ public class Table {
   public HashMap<String, Integer> columnPrecision;
   public HashMap<String, Integer> columnScale;
   public ArrayList<String> keyNames;
-  public ArrayList<Integer> keyIndexs;
 
   /**
    * Get metadata of a specific table using a given connection and construct a new {@code Table}.
    *
-   * @param tableMap  Table name Map
+   * @param tableMap  The schema including table
+   * @param tableName Table name
    * @param conn      Connection to the database
    * @throws BiremeException - Wrap and throw Exception which cannot be handled.
    */
-  public Table(String tableName, Map<String, JSONObject> tableMap, Connection conn)
+  public Table(String tableName, Map<String, List<String>> tableMap, Connection conn)
       throws BiremeException {
     this.ncolumns = 0;
     this.columnName = new ArrayList<String>();
     this.keyNames = new ArrayList<String>();
-    this.keyIndexs = new ArrayList<Integer>();
     this.columnType = new HashMap<String, Integer>();
     this.columnPrecision = new HashMap<String, Integer>();
     this.columnScale = new HashMap<String, Integer>();
@@ -59,14 +57,18 @@ public class Table {
     ResultSetMetaData rsMetaData = null;
 
     try {
-      this.keyNames.add(tableMap.get(tableName).getString("column_name"));
-      this.keyIndexs.add(tableMap.get(tableName).getInteger("keyindexs"));
+      List<String> mapList = tableMap.get(tableName);
+      for (int i = 0; i < mapList.size(); i++) {
+        this.keyNames.add(mapList.get(i));
+      }
+
       statement = conn.createStatement();
 
       String queryTableInfo = "select * from public." + tableName + " where 1=2";
       rs = statement.executeQuery(queryTableInfo);
       rsMetaData = rs.getMetaData();
       this.ncolumns = rsMetaData.getColumnCount();
+
       for (int i = 0, len = rsMetaData.getColumnCount(); i < len; i++) {
         String name = rsMetaData.getColumnName(i + 1);
         this.columnName.add(name);

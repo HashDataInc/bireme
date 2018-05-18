@@ -12,6 +12,7 @@ import java.sql.Statement;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -32,7 +33,6 @@ import org.apache.kafka.common.PartitionInfo;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.alibaba.fastjson.JSONObject;
 import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.JmxReporter;
@@ -57,7 +57,7 @@ public class Bireme implements Daemon {
   private static final String DEFAULT_CONFIG_FILE = "etc/config.properties";
   private DaemonContext context;
   private Context cxt;
-  private static HashMap<String, String> tableMap;
+
   private Logger logger = LogManager.getLogger("Bireme");
 
   private ConsoleReporter consoleReporter;
@@ -105,8 +105,8 @@ public class Bireme implements Daemon {
   protected void getTableInfo() throws BiremeException {
     logger.info("Start getting metadata of target tables from target database.");
 
-    Map<String, JSONObject> tableInfoMap = null;
-    tableMap = cxt.tableMap;
+    Map<String, List<String>> tableInfoMap = null;
+
     String[] strArray;
     Connection conn = BiremeUtility.jdbcConn(cxt.conf.targetDatabase);
 
