@@ -1,8 +1,10 @@
 CREATE TABLE numericsource (
-    id INTEGER NOT NULL PRIMARY KEY,
+    aid INTEGER,
+    bid INTEGER,
     alpha BIGINT,
     beta REAL,
-    gamma NUMERIC(5,2)
+    gamma NUMERIC(5,2),
+    PRIMARY KEY(aid,bid)
 );
 
 CREATE TABLE charsource (
@@ -27,11 +29,11 @@ CREATE TABLE binarysource (
 );
 
 INSERT INTO numericsource 
-VALUES (1, -9223372036854775808, -123.456, 10.1),
-       (2, 9223372036854775807, 12.345, 10),
-       (3, 100, null, 10.0),
-       (4, 100, 100, 10.01),
-       (5, 100, 100, null);
+VALUES (1, 1, -9223372036854775808, -123.456, 10.1),
+       (1, 2, 9223372036854775807, 12.345, 10),
+       (3, 1, 100, null, 10.0),
+       (3, 2, 100, 100, 10.01),
+       (1, 3, 100, 100, null);
 
 INSERT INTO charsource
 VALUES (1, 'rocks', 'hashdata', 'Bireme is an incremental synchronization tool for the Greenplum / HashData data warehouse'),
@@ -47,14 +49,3 @@ INSERT INTO binarysource
 VALUES (1, X'1A1B1C3D1F', false, B'110000011101100'),
        (2, X'ABCDEF1234', true, B'001100111100011'),
        (3, X'1A2B3C4D5E', false, B'101010011001100');
-
-UPDATE numericsource
-SET alpha = 101
-WHERE id = 3;
-
-UPDATE numericsource
-SET id = 400
-WHERE id = 4;
-
-DELETE FROM numericsource
-WHERE id = 5;
