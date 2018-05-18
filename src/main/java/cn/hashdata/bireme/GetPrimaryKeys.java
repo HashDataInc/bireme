@@ -1,6 +1,5 @@
 package cn.hashdata.bireme;
 
-import com.alibaba.fastjson.JSONObject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -18,12 +17,12 @@ import java.util.*;
 public class GetPrimaryKeys {
   private static Logger logger = LogManager.getLogger("Bireme." + GetPrimaryKeys.class);
 
-  public static Map<String, JSONObject> getPrimaryKeys(
+  public static Map<String, List<String>> getPrimaryKeys(
       HashMap<String, String> tableMap, Connection conn) throws Exception {
     Statement statement = null;
     ResultSet resultSet = null;
     ResultSet tableRs = null;
-    Map<String, JSONObject> table_map = new HashMap<>();
+    Map<String, List<String>> table_map = new HashMap<>();
     List<String> checkTableMap = new ArrayList<>();
     String[] strArray;
     StringBuilder sb = new StringBuilder();
@@ -58,10 +57,15 @@ public class GetPrimaryKeys {
 
       resultSet = statement.executeQuery(prSql);
       while (resultSet.next()) {
-        JSONObject jsonObject = new JSONObject();
-        jsonObject.put("keyindexs", resultSet.getInt("KEY_SEQ") - 1);
-        jsonObject.put("column_name", resultSet.getString("COLUMN_NAME"));
-        table_map.put(resultSet.getString("TABLE_NAME"), jsonObject);
+        String tableName = resultSet.getString("TABLE_NAME");
+        if (table_map.containsKey(tableName)) {
+          List<String> strings = table_map.get(tableName);
+          strings.add(resultSet.getString("COLUMN_NAME"));
+        } else {
+          List<String> multiPKList = new ArrayList<>();
+          multiPKList.add(resultSet.getString("COLUMN_NAME"));
+          table_map.put(tableName, multiPKList);
+        }
       }
 
       if (table_map.size() != tableMap.size()) {
