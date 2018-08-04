@@ -93,12 +93,10 @@ public class PipeLineStat {
    */
   public void addGaugeForCache(String table, RowCache cache) {
     Gauge<Long> gauge = new Gauge<Long>() {
-
       @Override
       public Long getValue() {
         return (long) cache.rows.size();
       }
-
     };
 
     cacheSize.put(table, gauge);

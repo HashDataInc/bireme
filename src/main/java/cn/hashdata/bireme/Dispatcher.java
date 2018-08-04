@@ -75,8 +75,8 @@ public class Dispatcher {
     HashMap<String, ArrayList<Row>> bucket = rowSet.rowBucket;
     boolean complete = true;
 
-    ArrayList < Entry < String, ArrayList<Row>>> entrySet = new ArrayList < Entry < String,
-                                                 ArrayList<Row>>>();
+    ArrayList<Entry<String, ArrayList<Row>>> entrySet =
+        new ArrayList<Entry<String, ArrayList<Row>>>();
     entrySet.addAll(bucket.entrySet());
 
     for (Entry<String, ArrayList<Row>> entry : entrySet) {
