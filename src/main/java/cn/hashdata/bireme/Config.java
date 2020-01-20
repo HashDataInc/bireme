@@ -58,6 +58,8 @@ public class Config {
   public HashMap<String, SourceConfig> sourceConfig;
   public HashMap<String, String> tableMap;
 
+  public boolean isDDL = false;
+
   public static class ConnectionConfig {
     public String jdbcUrl;
     public String user;
@@ -177,9 +179,20 @@ public class Config {
           throw new BiremeException(message);
       }
 
-      conf.tableMap = fetchTableMap(conf.name);
+      /**
+       * 如果是ddl操作，那么就不用获取配置文件(也没有哈)
+       */
+      if (!conf.topic.contains("ddl")) {
+        conf.tableMap = fetchTableMap(conf.name);
+      }
+      else{
+        this.isDDL = true;
+      }
     }
 
+    /**
+     * 默认的数据库连接(10)
+     */
     if (loader_conn_size > loadersCount) {
       loader_conn_size = loadersCount;
     }
@@ -262,6 +275,9 @@ public class Config {
 
       localTableMap.put(dataSource + "." + originTable, mappedTable);
 
+      /**
+       * jdbc 数据库连接，一个表一个
+       */
       if (!tableMap.values().contains(mappedTable)) {
         loadersCount++;
       }

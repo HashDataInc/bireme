@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.TimeZone;
 import java.util.stream.Collectors;
 
+import com.alibaba.fastjson.JSONObject;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -208,14 +209,14 @@ public class DebeziumPipeLine extends KafkaPipeLine {
       public String topic;
       public Long produceTime;
       public RowType type;
-      public JsonObject data;
+      public JSONObject data;
 
       public DebeziumRecord(String topic, JsonObject payLoad) {
         this.topic = topic;
         char op = payLoad.get("op").getAsCharacter();
         this.produceTime = payLoad.get("ts_ms").getAsLong();
 
-        JsonElement element = null;
+        Object element = null;
         switch (op) {
           case 'r':
           case 'c':
@@ -234,7 +235,7 @@ public class DebeziumPipeLine extends KafkaPipeLine {
             break;
         }
 
-        this.data = element.getAsJsonObject();
+        this.data = (JSONObject) element;
       }
 
       @Override
