@@ -1,4 +1,4 @@
-# bireme
+# bireme-- （based on https://github.com/HashDataInc/bireme ，enable to stand by DDL operation）
 
 [![Build Status](https://travis-ci.org/HashDataInc/bireme.svg)](https://travis-ci.org/HashDataInc/bireme)
 
