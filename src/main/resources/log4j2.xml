@@ -7,13 +7,53 @@
     <Console name="BiremeConsole" target="SYSTEM_OUT">
       <PatternLayout pattern="%d{HH:mm:ss} %-5level %logger{-1} - %msg%n"/>"
     </Console>
+    <RollingFile name="RollingFileInfo" fileName="${sys:user.home}/logs/bireme/info.log" filePattern="${sys:user.home}/logs/bireme/$${date:yyyy-MM}/info-%d{yyyy-MM-dd}-%i.log">
+      <!--控制台只输出level及以上级别的信息（onMatch），其他的直接拒绝（onMismatch）-->
+      <ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY"/>
+      <PatternLayout pattern="[%d{HH:mm:ss:SSS}] [%p] - %l - %m%n"/>
+      <Policies>
+        <TimeBasedTriggeringPolicy/>
+        <SizeBasedTriggeringPolicy size="100 MB"/>
+      </Policies>
+    </RollingFile>
+    <RollingFile name="RollingFileWarn" fileName="${sys:user.home}/logs/bireme/warn.log" filePattern="${sys:user.home}/logs/bireme/$${date:yyyy-MM}/warn-%d{yyyy-MM-dd}-%i.log">
+      <ThresholdFilter level="warn" onMatch="ACCEPT" onMismatch="DENY"/>
+      <PatternLayout pattern="[%d{HH:mm:ss:SSS}] [%p] - %l - %m%n"/>
+      <Policies>
+        <TimeBasedTriggeringPolicy/>
+        <SizeBasedTriggeringPolicy size="100 MB"/>
+      </Policies>
+      <!-- DefaultRolloverStrategy属性如不设置，则默认为最多同一文件夹下7个文件，这里设置了20 -->
+      <DefaultRolloverStrategy max="20"/>
+    </RollingFile>
+    <RollingFile name="RollingFileError" fileName="${sys:user.home}/logs/bireme/error.log" filePattern="${sys:user.home}/logs/bireme/$${date:yyyy-MM}/error-%d{yyyy-MM-dd}-%i.log">
+      <ThresholdFilter level="error" onMatch="ACCEPT" onMismatch="DENY"/>
+      <PatternLayout pattern="[%d{HH:mm:ss:SSS}] [%p] - %l - %m%n"/>
+      <Policies>
+        <TimeBasedTriggeringPolicy/>
+        <SizeBasedTriggeringPolicy size="100 MB"/>
+      </Policies>
+    </RollingFile>
+    <RollingFile name="RollingFileDebug" fileName="${sys:user.home}/logs/bireme/debug.log" filePattern="${sys:user.home}/logs/bireme/$${date:yyyy-MM}/debug-%d{yyyy-MM-dd}-%i.log">
+      <ThresholdFilter level="debug" onMatch="ACCEPT" onMismatch="DENY"/>
+      <PatternLayout pattern="[%d{HH:mm:ss:SSS}] [%p] - %l - %m%n"/>
+      <Policies>
+        <TimeBasedTriggeringPolicy/>
+        <SizeBasedTriggeringPolicy size="100 MB"/>
+      </Policies>
+    </RollingFile>
   </Appenders>
   <Loggers>
     <Root level="error">
       <AppenderRef ref="Console"/>
+      <AppenderRef ref="RollingFileInfo"/>
+      <AppenderRef ref="RollingFileDebug"/>
+      <AppenderRef ref="RollingFileWarn"/>
+      <AppenderRef ref="RollingFileError"/>
     </Root>
     <Logger name="Bireme" level="info" additivity="false">  
-      <AppenderRef ref="BiremeConsole" />  
+      <AppenderRef ref="BiremeConsole" />
+      <AppenderRef ref="RollingFileInfo"/>
     </Logger> 
   </Loggers>
 </Configuration>
