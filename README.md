@@ -1,4 +1,4 @@
-# bireme-- （基于HashDataInc/bireme改造，可支持DDL操作）
+# bireme-- （基于https://github.com/HashDataInc/bireme改造，可支持DDL操作）
 
 [![Build Status](https://travis-ci.org/HashDataInc/bireme.svg)](https://travis-ci.org/HashDataInc/bireme)
 
