@@ -67,10 +67,10 @@ public class Bireme implements Daemon {
 
     /**
      * 解析命令行参数
-     * @param args
-     * @throws DaemonInitException
-     * @throws ConfigurationException
-     * @throws BiremeException
+     * @param args 命令行参数
+     * @throws DaemonInitException Daemon初始化异常
+     * @throws ConfigurationException 配置异常
+     * @throws BiremeException 自定义异常
      */
     protected void parseCommandLine(String[] args)
             throws DaemonInitException, ConfigurationException, BiremeException {
@@ -198,8 +198,8 @@ public class Bireme implements Daemon {
     }
 
     /**
-     * 创建
-     * @throws BiremeException
+     * 创建pipeline
+     * @throws BiremeException 自定义异常
      */
     protected void createPipeLine() throws BiremeException {
         for (SourceConfig conf : cxt.conf.sourceConfig.values()) {
