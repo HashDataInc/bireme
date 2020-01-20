@@ -176,7 +176,7 @@ public abstract class KafkaPipeLine extends PipeLine {
 
         /**
          * 判断数据库是否存在
-         * @auth zhuhai
+         * @author zhuhai
          *
          * @param database 数据库名
          * @return true--存在
@@ -223,7 +223,7 @@ public abstract class KafkaPipeLine extends PipeLine {
 
         /**
          * 执行对数据库的操作的ddl
-         * @auth zhuhai
+         * @author zhuhai
          *
          * @param row 1条消费的记录
          */
@@ -255,7 +255,7 @@ public abstract class KafkaPipeLine extends PipeLine {
 
         /**
          * 判断表是否存在
-         * @auth zhuhai
+         * @author zhuhai
          *
          * @param tableName 表名
          * @return 表是否存在
@@ -304,7 +304,7 @@ public abstract class KafkaPipeLine extends PipeLine {
 
         /**
          * 删除表
-         * @auth zhuhai
+         * @author zhuhai
          *
          * @param tableName 表名
          * @return true 删除成功
@@ -349,7 +349,7 @@ public abstract class KafkaPipeLine extends PipeLine {
 
         /**
          * 创建表
-         * @auth zhuhai
+         * @author zhuhai
          *
          * @param row 记录
          * @return 创建表是否成功
@@ -435,7 +435,7 @@ public abstract class KafkaPipeLine extends PipeLine {
 
         /**
          * 判断两个表是否数据同步
-         * @auth zhuhai
+         * @author zhuhai
          *
          * @param table1 第一个表
          * @param table2 第二个表
@@ -482,7 +482,7 @@ public abstract class KafkaPipeLine extends PipeLine {
         /**
          * 修改表
          * 修改的策略是： 先将数据被分到临时表；然后删除表；最后再创建表并插入数据
-         * @auth zhuhai
+         * @author zhuhai
          *
          * @param row 记录
          * @param tmpTable 临时表
@@ -578,7 +578,7 @@ public abstract class KafkaPipeLine extends PipeLine {
 
         /**
          * 关闭statement
-         * @auth zhuhai
+         * @author zhuhai
          *
          * @param statments statement数组
          */
