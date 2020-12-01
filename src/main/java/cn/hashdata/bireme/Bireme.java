@@ -123,7 +123,7 @@ public class Bireme implements Daemon {
       }
 
       strArray = fullname.split("\\.");
-      cxt.tablesInfo.put(fullname, new Table(strArray[1], tableInfoMap, conn));
+      cxt.tablesInfo.put(fullname, new Table(fullname, tableInfoMap, conn));
     }
 
     try {
