@@ -57,11 +57,11 @@ public class Scheduler implements Callable<Long> {
             // get result of all completed pipeline
             if (workingPipeLine != 0) {
                 while (!cxt.stop) {
-                    Future<PipeLine> result = cs.poll();
+                    // 只有一张表的同步出现中断 result 值才为非空，正常运行情况下都是 null
+                    // 为了避免 Schedule 单线程进入死循环的状态，所以需要增加一定的等待时间
+                    Future<PipeLine> result = cs.poll(5, TimeUnit.SECONDS);
                     PipeLine complete = null;
 
-                    // TODO:如果为空，是否要等待一下在执行？否则此处会造成死循环？
-                    // 还是说 cs.poll() 可以实现阻塞的效果
                     if (result == null) {
                         break;
                     }
