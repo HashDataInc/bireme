@@ -35,7 +35,7 @@ public class DebeziumPipeLine extends KafkaPipeLine {
         logger = LogManager.getLogger(DebeziumPipeLine.class);
         logger.info("Create new Debezium PipeLine. Name: {}", myName);
 
-        // TODO:是否必要？
+        // TODO:为什么此处没有继承自父类，而还需要重申名呢？
         this.conf = conf;
 
         consumer.subscribe(Arrays.asList(topic));
@@ -67,8 +67,6 @@ public class DebeziumPipeLine extends KafkaPipeLine {
             JsonParser jsonParser = new JsonParser();
             JsonObject value = (JsonObject) jsonParser.parse(change.value());
 
-            // TODO:如果是DELETE記錄，該怎麼處理？
-
             if (!value.has("payload") || value.get("payload").isJsonNull()) {
                 return false;
             }
@@ -83,8 +81,6 @@ public class DebeziumPipeLine extends KafkaPipeLine {
             row.originTable = getOriginTableName(record);
             row.mappedTable = getMappedTableName(record);
             row.keys = formatColumns(record, table, table.keyNames, false);
-
-            // TODO:如果是DELETE記錄，該怎麼處理？
 
             if (row.type != RowType.DELETE) {
                 row.tuple = formatColumns(record, table, table.columnName, false);

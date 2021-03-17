@@ -75,7 +75,7 @@ public class GetPrimaryKeys {
                 }
             }
 
-            // TODO:是否要校验主键, 倒是未必, 有待后期再完善
+            // 校验主键是否缺失，原始版本不支持不含主键的表同步
             if (tablePRMap.size() != tableMap.size()) {
                 String message = "some tables do not have primary keys！";
                 throw new BiremeException(message);

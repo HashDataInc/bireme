@@ -240,10 +240,8 @@ public class Config {
                 throw new BiremeException(message);
             }
 
-            // TODO:为什么有了 tableMap，却还要引入 localTableMap?
-
             localTableMap.put(dataSource + "." + originTable, mappedTable);
-            // 从全局来看，几张目标表，开几个loader，有和意义？
+            // 从全局来看，几张目标表，开几个loader，以此为创建数据库连接的依据
             if (!tableMap.containsValue(mappedTable)) {
                 loadersCount++;
             }

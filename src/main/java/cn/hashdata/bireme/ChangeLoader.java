@@ -101,7 +101,7 @@ public class ChangeLoader implements Callable<Long> {
             // get connection
             conn = getConnection();
             if (conn == null) {
-                logger.debug("Unable to get Connection.");
+                logger.error("Unable to get Connection.");
                 break;
             }
 
@@ -116,9 +116,6 @@ public class ChangeLoader implements Callable<Long> {
                     conn.rollback();
                     conn.close();
                 } catch (Exception ignore) {
-                    // TODO:这种情况下抛出的异常究竟是哪个？
-                    logger.error("Fail to roll back after load exception. Message: {}", e.getMessage());
-                    throw e;
                 }
                 throw e;
 
@@ -300,16 +297,14 @@ public class ChangeLoader implements Callable<Long> {
 
         try {
             while (!copyResult.isDone() && !cxt.stop) {
-                Thread.sleep(1);
+                Thread.sleep(5);
             }
-
             copyCount = copyResult.get();
         } catch (ExecutionException e) {
             logger.error("Copy failed. Message: {}", e.getMessage());
             throw new BiremeException("Copy failed.", e.getCause());
         }
 
-        // TODO:为什么该错误，需要后置抛出呢？而不是在Exection报出？
         if (temp != null) {
             throw temp;
         }

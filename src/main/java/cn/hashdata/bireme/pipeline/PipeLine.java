@@ -96,7 +96,7 @@ public abstract class PipeLine implements Callable<PipeLine> {
 
     private boolean transData() {
         while (transResult.remainingCapacity() != 0) {
-            ChangeSet changeSet = null;
+            ChangeSet changeSet;
 
             try {
                 changeSet = pollChangeSet();
@@ -113,10 +113,10 @@ public abstract class PipeLine implements Callable<PipeLine> {
                 break;
             }
 
-            // TODO:爲什麼要先去除再添加回來
             Transformer trans = localTransformer.remove();
             trans.setChangeSet(changeSet);
             startTransform(trans);
+            // TODO:此处直接释放回池子是否合适？ 如何此一来管控是否足够
             localTransformer.add(trans);
         }
 

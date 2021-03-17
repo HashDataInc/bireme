@@ -20,7 +20,6 @@ public class Dispatcher {
     public Context cxt;
     public PipeLine pipeLine;
     public RowSet rowSet;
-    public boolean complete;
     public LinkedBlockingQueue<Future<RowSet>> transResult;
     public ConcurrentHashMap<String, RowCache> cache;
 
@@ -28,7 +27,6 @@ public class Dispatcher {
         this.cxt = cxt;
         this.pipeLine = pipeLine;
         this.rowSet = null;
-        this.complete = false;
         this.transResult = pipeLine.transResult;
         this.cache = pipeLine.cache;
     }
@@ -40,14 +38,6 @@ public class Dispatcher {
      * @throws InterruptedException if the current thread was interrupted while waiting
      */
     public void dispatch() throws BiremeException, InterruptedException {
-        // TODO:沒見進來過，有何意義？
-        if (rowSet != null) {
-            complete = insertRowSet();
-
-            if (!complete) {
-                return;
-            }
-        }
 
         while (!transResult.isEmpty() && !cxt.stop) {
             Future<RowSet> head = transResult.peek();
@@ -60,9 +50,7 @@ public class Dispatcher {
                     throw new BiremeException("Transform failed.", e.getCause());
                 }
 
-                complete = insertRowSet();
-
-                if (!complete) {
+                if (!insertRowSet()) {
                     break;
                 }
             } else {
