@@ -95,6 +95,8 @@ public class Context {
      */
     public void startScheduler() {
         scheduleResult = schedule.submit(new Scheduler(this));
+
+        // TODO:以下操作应该提出来
         server.start();
     }
 

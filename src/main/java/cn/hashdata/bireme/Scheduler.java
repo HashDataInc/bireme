@@ -38,12 +38,10 @@ public class Scheduler implements Callable<Long> {
     public Long call() throws BiremeException, InterruptedException {
         logger.info("Scheduler start working.");
 
-        PipeLine pipeLine = null;
-
         while (!cxt.stop) {
             // start up all normal pipeline
             while (!pipeLineQueue.isEmpty() && !cxt.stop) {
-                pipeLine = pipeLineQueue.removeFirst();
+                PipeLine pipeLine = pipeLineQueue.removeFirst();
                 switch (pipeLine.state) {
                     case NORMAL:
                         cs.submit(pipeLine);
@@ -60,12 +58,11 @@ public class Scheduler implements Callable<Long> {
                     // 只有一张表的同步出现中断 result 值才为非空，正常运行情况下都是 null
                     // 为了避免 Schedule 单线程进入死循环的状态，所以需要增加一定的等待时间
                     Future<PipeLine> result = cs.poll(5, TimeUnit.SECONDS);
-                    PipeLine complete = null;
-
                     if (result == null) {
                         break;
                     }
 
+                    PipeLine complete = null;
                     try {
                         complete = result.get();
                     } catch (ExecutionException e) {

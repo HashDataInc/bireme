@@ -38,22 +38,24 @@ public class Dispatcher {
      * @throws InterruptedException if the current thread was interrupted while waiting
      */
     public void dispatch() throws BiremeException, InterruptedException {
+        if (rowSet != null && !insertRowSet()) {
+            return;
+        }
 
         while (!transResult.isEmpty() && !cxt.stop) {
             Future<RowSet> head = transResult.peek();
-
-            if (head.isDone()) {
-                transResult.remove();
-                try {
-                    rowSet = head.get();
-                } catch (ExecutionException e) {
-                    throw new BiremeException("Transform failed.", e.getCause());
-                }
-
-                if (!insertRowSet()) {
-                    break;
-                }
-            } else {
+            
+            if (!head.isDone()) {
+                break;
+            }
+            // Done
+            transResult.remove();
+            try {
+                rowSet = head.get();
+            } catch (ExecutionException e) {
+                throw new BiremeException("Transform failed.", e.getCause());
+            }
+            if (!insertRowSet()) {
                 break;
             }
         }
@@ -63,6 +65,7 @@ public class Dispatcher {
         HashMap<String, ArrayList<Row>> bucket = rowSet.rowBucket;
         boolean complete = true;
 
+        // TODO:怎么理解该结构？
         ArrayList<Entry<String, ArrayList<Row>>> entrySet =
                 new ArrayList<Entry<String, ArrayList<Row>>>();
         entrySet.addAll(bucket.entrySet());

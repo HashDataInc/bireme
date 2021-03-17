@@ -30,15 +30,16 @@ public class DebeziumPipeLine extends KafkaPipeLine {
     public SourceConfig conf;
 
     public DebeziumPipeLine(Context cxt, SourceConfig conf, String topic) {
+        // Notice: myName的命名会对 PipeLineStat 产生影响
         super(cxt, conf, "Debezium-" + conf.name + "-" + topic);
+        // TODO:字符串怎么转化集合类型
+        consumer.subscribe(Arrays.asList(topic));
 
         logger = LogManager.getLogger(DebeziumPipeLine.class);
         logger.info("Create new Debezium PipeLine. Name: {}", myName);
 
         // TODO:为什么此处没有继承自父类，而还需要重申名呢？
         this.conf = conf;
-
-        consumer.subscribe(Arrays.asList(topic));
     }
 
     @Override

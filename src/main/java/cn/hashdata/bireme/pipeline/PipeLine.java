@@ -42,18 +42,17 @@ public abstract class PipeLine implements Callable<PipeLine> {
         this.cxt = cxt;
         this.conf = conf;
 
-        int queueSize = cxt.conf.transform_queue_size;
+        int queueSize = cxt.conf.transform_pool_size;
 
-        transResult = new LinkedBlockingQueue<Future<RowSet>>(queueSize);
         localTransformer = new LinkedList<Transformer>();
-
-        cache = new ConcurrentHashMap<String, RowCache>();
-
-        dispatcher = new Dispatcher(cxt, this);
-
         for (int i = 0; i < queueSize; i++) {
             localTransformer.add(createTransformer());
         }
+        transResult = new LinkedBlockingQueue<Future<RowSet>>(queueSize);
+
+        cache = new ConcurrentHashMap<String, RowCache>();
+        
+        dispatcher = new Dispatcher(cxt, this);
 
         // initialize statistics
         this.stat = new PipeLineStat(this);
@@ -62,6 +61,8 @@ public abstract class PipeLine implements Callable<PipeLine> {
     @Override
     public PipeLine call() {
         try {
+            // TODO:常驻线程 or 频繁创建新线程
+            // 处理完一批会退出吗？
             executePipeline();
         } catch (Exception e) {
             state = PipeLineState.ERROR;
@@ -74,24 +75,24 @@ public abstract class PipeLine implements Callable<PipeLine> {
         return this;
     }
 
-    private PipeLine executePipeline() {
+    private void executePipeline() {
         // Poll data and start transformer
         if (!transData()) {
-            return this;
+            return ;
         }
 
         // Start dispatcher, only one dispatcher for each pipeline
         if (!startDispatch()) {
-            return this;
+            return ;
         }
 
         // Start merger
         if (!startMerge()) {
-            return this;
+            return ;
         }
 
-        checkAndCommit(); // Commit result
-        return this;
+        // Commit result
+        checkAndCommit(); 
     }
 
     private boolean transData() {
@@ -110,9 +111,11 @@ public abstract class PipeLine implements Callable<PipeLine> {
             }
 
             if (changeSet == null) {
+                // TODO:为什么要退出呢？
                 break;
             }
 
+            // TODO:如果已经找不到可用的transformer，下面操作会阻塞吗
             Transformer trans = localTransformer.remove();
             trans.setChangeSet(changeSet);
             startTransform(trans);

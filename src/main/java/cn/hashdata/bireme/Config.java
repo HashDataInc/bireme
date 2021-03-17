@@ -29,7 +29,6 @@ public class Config {
     private final Configuration config;
     public int pipeline_pool_size;
     public int transform_pool_size;
-    public int transform_queue_size;
     public int row_cache_size;
     public int merge_pool_size;
     public int merge_interval;
@@ -72,7 +71,6 @@ public class Config {
         pipeline_pool_size = config.getInt("pipeline.thread_pool.size", 5);
 
         transform_pool_size = config.getInt("transform.thread_pool.size", 10);
-        transform_queue_size = transform_pool_size;
 
         merge_pool_size = config.getInt("merge.thread_pool.size", 10);
         merge_interval = config.getInt("merge.interval", 10000);
@@ -258,15 +256,19 @@ public class Config {
     public void logConfig() {
         String config = "Configures: "
                 + "\n\tpipeline thread pool size = " + pipeline_pool_size
-                + "\n\ttransform thread pool size = " + transform_pool_size + "\n\ttransform queue size = "
-                + transform_queue_size + "\n\trow cache size = " + row_cache_size
+                + "\n\ttransform thread pool size = " + transform_pool_size
+                + "\n\trow cache size = " + row_cache_size
                 + "\n\tmerge thread pool size = " + merge_pool_size
-                + "\n\tmerge interval = " + merge_interval + "\n\tbatch size = " + batch_size
-                + "\n\tloader connection size = " + loader_conn_size + "\n\tloader task queue size = "
-                + loader_task_queue_size + "\n\tloaders count = " + loadersCount
-                + "\n\treporter = " + reporter + "\n\treport interval = " + report_interval
-                + "\n\tstate server addr = " + state_server_addr + "\n\tstate server port = "
-                + state_server_port + "\n\ttarget database url = " + targetDatabase.jdbcUrl;
+                + "\n\tmerge interval = " + merge_interval
+                + "\n\tbatch size = " + batch_size
+                + "\n\tloader connection size = " + loader_conn_size
+                + "\n\tloader task queue size = " + loader_task_queue_size 
+                + "\n\tloaders count = " + loadersCount
+                + "\n\treporter = " + reporter 
+                + "\n\treport interval = " + report_interval
+                + "\n\tstate server addr = " + state_server_addr 
+                + "\n\tstate server port = " + state_server_port 
+                + "\n\ttarget database url = " + targetDatabase.jdbcUrl;
 
         logger.info(config);
 
