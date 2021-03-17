@@ -8,7 +8,6 @@ import com.google.gson.JsonParser;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.logging.log4j.LogManager;
 
 import java.math.BigDecimal;
@@ -16,8 +15,10 @@ import java.math.BigInteger;
 import java.sql.Types;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.TimeZone;
 
 /**
  * {@code DebeziumPipeLine} is a kind of {@code KafkaPipeLine} whose change data coming from
@@ -28,7 +29,7 @@ import java.util.stream.Collectors;
 public class DebeziumPipeLine extends KafkaPipeLine {
     public SourceConfig conf;
 
-    public DebeziumPipeLine(Context cxt, SourceConfig conf, String topic) throws BiremeException {
+    public DebeziumPipeLine(Context cxt, SourceConfig conf, String topic) {
         super(cxt, conf, "Debezium-" + conf.name + "-" + topic);
 
         logger = LogManager.getLogger(DebeziumPipeLine.class);
@@ -37,11 +38,6 @@ public class DebeziumPipeLine extends KafkaPipeLine {
         // TODO:是否必要？
         this.conf = conf;
 
-        List<TopicPartition> topicPartition =
-                consumer.partitionsFor(topic)
-                        .stream()
-                        .map(p -> new TopicPartition(p.topic(), p.partition()))
-                        .collect(Collectors.toList());
         consumer.subscribe(Arrays.asList(topic));
     }
 
@@ -99,9 +95,7 @@ public class DebeziumPipeLine extends KafkaPipeLine {
 
         @Override
         protected byte[] decodeToBinary(String data) {
-            byte[] decoded = null;
-            decoded = Base64.decodeBase64(data);
-            return decoded;
+            return Base64.decodeBase64(data);
         }
 
         @Override
@@ -142,11 +136,9 @@ public class DebeziumPipeLine extends KafkaPipeLine {
                         return data;
                     }
 
-                    // TODO:针对长整形，也被认为是TIMESTAMP类型，所以解析会报错
-
-                    int sec = Integer.parseInt(data.substring(0, data.length() - 9));
-                    String fraction = data.substring(data.length() - 9, data.length() - 9 + precision);
-                    Date d = new Date(sec * 1000L);
+                    // Debezium convert the timestamp to mill seconds
+                    int sec = Integer.parseInt(data.substring(0, data.length() - 3));
+                    String fraction = data.substring(data.length() - 3);
 
                     SimpleDateFormat df;
                     if (fieldType == Types.TIME) {
@@ -154,8 +146,9 @@ public class DebeziumPipeLine extends KafkaPipeLine {
                     } else {
                         df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
                     }
-                    df.setTimeZone(TimeZone.getTimeZone("GMT"));
+                    df.setTimeZone(TimeZone.getTimeZone("UTC"));
 
+                    Date d = new Date(sec * 1000L);
                     sb.append(df.format(d));
                     sb.append('.' + fraction);
                     break;

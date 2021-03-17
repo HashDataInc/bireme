@@ -16,7 +16,7 @@ import java.util.concurrent.*;
  * <li>Poll data and allocate {@link Transformer} to convert the data.</li>
  * <li>Dispatch the transformed data and insert it into {@link RowCache}.</li>
  * <li>Drive the {@code RowBatchMerger} to work</li>
- * <li>Drivet the {@code ChangeLoader} to work</li>
+ * <li>Drive the {@code ChangeLoader} to work</li>
  * </ul>
  *
  * @author yuze
@@ -76,17 +76,17 @@ public abstract class PipeLine implements Callable<PipeLine> {
 
     private PipeLine executePipeline() {
         // Poll data and start transformer
-        if (transData() == false) {
+        if (!transData()) {
             return this;
         }
 
         // Start dispatcher, only one dispatcher for each pipeline
-        if (startDispatch() == false) {
+        if (!startDispatch()) {
             return this;
         }
 
         // Start merger
-        if (startMerge() == false) {
+        if (!startMerge()) {
             return this;
         }
 
@@ -113,6 +113,7 @@ public abstract class PipeLine implements Callable<PipeLine> {
                 break;
             }
 
+            // TODO:爲什麼要先去除再添加回來
             Transformer trans = localTransformer.remove();
             trans.setChangeSet(changeSet);
             startTransform(trans);
@@ -131,16 +132,13 @@ public abstract class PipeLine implements Callable<PipeLine> {
 
             logger.error("Dispatch failed. Message: {}", e.getMessage());
             logger.error("Stack Trace: ", e);
-
             return false;
-
         } catch (InterruptedException e) {
             state = PipeLineState.ERROR;
             this.e = new BiremeException("Dispatcher failed, be interrupted", e);
 
             logger.info("Interrupted when getting transform result. Message: {}.", e.getMessage());
             logger.info("Stack Trace: ", e);
-
             return false;
         }
 
@@ -155,16 +153,13 @@ public abstract class PipeLine implements Callable<PipeLine> {
 
             try {
                 rowCache.startLoad();
-
             } catch (BiremeException e) {
                 state = PipeLineState.ERROR;
                 this.e = e;
 
                 logger.info("Loader for {} failed. Message: {}.", rowCache.tableName, e.getMessage());
                 logger.info("Stack Trace: ", e);
-
                 return false;
-
             } catch (InterruptedException e) {
                 state = PipeLineState.ERROR;
                 this.e = new BiremeException("Get Future<Long> failed, be interrupted", e);
@@ -172,7 +167,6 @@ public abstract class PipeLine implements Callable<PipeLine> {
                 logger.info("Interrupted when getting loader result for {}. Message: {}.",
                         rowCache.tableName, e.getMessage());
                 logger.info("Stack Trace: ", e);
-
                 return false;
             }
         }
@@ -241,7 +235,7 @@ public abstract class PipeLine implements Callable<PipeLine> {
          * Borrow an empty {@code RowSet} and write the data acquired from {@code ChangeSet} to the
          * {@code RowSet}. Finally, return the filled {@code RowSet}.
          *
-         * @throws BiremeException when unable to transform the recoed
+         * @throws BiremeException when unable to transform the record
          */
         @Override
         public RowSet call() throws BiremeException {
@@ -297,8 +291,7 @@ public abstract class PipeLine implements Callable<PipeLine> {
                         case Types.LONGVARBINARY:
                         case Types.NCLOB:
                         case Types.VARBINARY: {
-                            byte[] decoded = null;
-                            decoded = decodeToBinary(data);
+                            byte[] decoded = decodeToBinary(data);
                             tupleStringBuilder.append(escapeBinary(decoded));
                             break;
                         }

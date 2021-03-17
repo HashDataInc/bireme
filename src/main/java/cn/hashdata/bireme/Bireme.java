@@ -123,18 +123,17 @@ public class Bireme implements Daemon {
         logger.info("Start establishing connections for loaders.");
 
         LinkedBlockingQueue<Connection> conns = cxt.loaderConnections;
-        HashMap<Connection, HashSet<String>> temporatyTables = cxt.temporaryTables;
-        Connection conn = null;
+        HashMap<Connection, HashSet<String>> temporaryTables = cxt.temporaryTables;
 
         try {
             for (int i = 0, number = cxt.conf.loader_conn_size; i < number; i++) {
-                conn = BiremeUtility.jdbcConn(cxt.conf.targetDatabase);
+                Connection conn = BiremeUtility.jdbcConn(cxt.conf.targetDatabase);
                 conn.setAutoCommit(true);
-                Statement stmt = conn.createStatement();
 
+                Statement stmt = conn.createStatement();
                 stmt.execute("set enable_nestloop = on;");
                 stmt.execute("set enable_seqscan = off;");
-                // stmt.execute("set enable_hashjoin = off;");
+                stmt.execute("set enable_hashjoin = off;");
 
                 try {
                     stmt.execute("set gp_autostats_mode = none;");
@@ -143,10 +142,10 @@ public class Bireme implements Daemon {
 
                 conn.setAutoCommit(false);
                 conns.add(conn);
-                temporatyTables.put(conn, new HashSet<String>());
+                temporaryTables.put(conn, new HashSet<String>());
             }
         } catch (SQLException e) {
-            for (Connection closeConn : temporatyTables.keySet()) {
+            for (Connection closeConn : temporaryTables.keySet()) {
                 try {
                     closeConn.close();
                 } catch (SQLException ignore) {

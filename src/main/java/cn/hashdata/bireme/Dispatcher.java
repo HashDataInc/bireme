@@ -40,6 +40,7 @@ public class Dispatcher {
      * @throws InterruptedException if the current thread was interrupted while waiting
      */
     public void dispatch() throws BiremeException, InterruptedException {
+        // TODO:沒見進來過，有何意義？
         if (rowSet != null) {
             complete = insertRowSet();
 
