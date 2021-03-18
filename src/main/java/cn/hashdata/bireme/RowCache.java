@@ -108,9 +108,11 @@ public class RowCache {
         RowBatchMerger merger = localMerger.remove();
         merger.setBatch(batch, callbacks);
 
+        // 类似的: 下面的过程在 transformer 过程中被封装成了 startTransform(trans);
         ExecutorService mergerPool = cxt.mergerPool;
         Future<LoadTask> task = mergerPool.submit(merger);
         mergeResult.add(task);
+
         localMerger.add(merger);
 
         lastMergeTime = new Date().getTime();
@@ -127,6 +129,8 @@ public class RowCache {
         Future<LoadTask> head = mergeResult.peek();
 
         if (head != null && head.isDone()) {
+            // TODO:loadResult咋一上來就有值了呢？
+            // TODO:loadResult就一個，是說一個pipeline就用一個loader就行了？
             // get result of last load
             if (loadResult != null && loadResult.isDone()) {
                 try {

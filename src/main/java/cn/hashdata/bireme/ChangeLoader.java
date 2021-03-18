@@ -88,6 +88,8 @@ public class ChangeLoader implements Callable<Long> {
      */
     @Override
     public Long call() throws BiremeException, InterruptedException {
+        // TODO:数据加载成功之后，为什么不退出循环呢？
+        // 如果有很多数据堆积的话，则该线程继续工作
         while (!cxt.stop) {
             // get task
             if (currentTask == null) {
@@ -111,14 +113,13 @@ public class ChangeLoader implements Callable<Long> {
                 releaseConnection();
             } catch (BiremeException e) {
                 logger.error("Fail to execute task. Message: {}", e.getMessage());
-
                 try {
                     conn.rollback();
                     conn.close();
-                } catch (Exception ignore) {
+                } catch (Exception ee) {
+                    logger.error("Fail to roll back after load exception. Message: {}", ee.getMessage());
                 }
                 throw e;
-
             } finally {
                 currentTask.destory();
                 currentTask = null;
@@ -252,15 +253,15 @@ public class ChangeLoader implements Callable<Long> {
         try {
             copyWorker(mappedTable, columnList, insertSet);
         } catch (BiremeException e) {
+            // 如果了乐观处理没成功，则只能先删后新增了
             if (e.getCause().getMessage().contains("duplicate key value") && optimisticMode) {
                 try {
                     conn.rollback();
                 } catch (SQLException ignore) {
                 }
 
-                optimisticMode = false;
-
                 logger.info("Chang to passimistic mode.");
+                optimisticMode = false;
 
                 executeDelete(currentTask.insert.keySet());
                 executeInsert(insertSet);
@@ -268,7 +269,6 @@ public class ChangeLoader implements Callable<Long> {
                 throw e;
             }
         }
-
         timerCTX.stop();
     }
 

@@ -113,7 +113,6 @@ public abstract class PipeLine implements Callable<PipeLine> {
                 break;
             }
 
-            // TODO:是否需要考慮NoSuchElementException的情況
             Transformer trans = localTransformer.remove();
             trans.setChangeSet(changeSet);
             startTransform(trans);
