@@ -61,8 +61,7 @@ public abstract class PipeLine implements Callable<PipeLine> {
     @Override
     public PipeLine call() {
         try {
-            // TODO:常驻线程 or 频繁创建新线程
-            // 处理完一批会退出吗？
+            // 处理完一批数据后该线程退出，然后再被Scheduler重新调度
             executePipeline();
         } catch (Exception e) {
             state = PipeLineState.ERROR;
@@ -111,15 +110,14 @@ public abstract class PipeLine implements Callable<PipeLine> {
             }
 
             if (changeSet == null) {
-                // TODO:为什么要退出呢？
                 break;
             }
 
-            // TODO:如果已经找不到可用的transformer，下面操作会阻塞吗
+            // TODO:是否需要考慮NoSuchElementException的情況
             Transformer trans = localTransformer.remove();
             trans.setChangeSet(changeSet);
             startTransform(trans);
-            // TODO:此处直接释放回池子是否合适？ 如何此一来管控是否足够
+            // TODO:在此直接釋放回池子是否合適
             localTransformer.add(trans);
         }
 

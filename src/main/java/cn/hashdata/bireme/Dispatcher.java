@@ -65,7 +65,6 @@ public class Dispatcher {
         HashMap<String, ArrayList<Row>> bucket = rowSet.rowBucket;
         boolean complete = true;
 
-        // TODO:怎么理解该结构？
         ArrayList<Entry<String, ArrayList<Row>>> entrySet =
                 new ArrayList<Entry<String, ArrayList<Row>>>();
         entrySet.addAll(bucket.entrySet());

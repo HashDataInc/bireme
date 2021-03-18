@@ -57,12 +57,12 @@ public class Scheduler implements Callable<Long> {
                 while (!cxt.stop) {
                     // 只有一张表的同步出现中断 result 值才为非空，正常运行情况下都是 null
                     // 为了避免 Schedule 单线程进入死循环的状态，所以需要增加一定的等待时间
-                    Future<PipeLine> result = cs.poll(5, TimeUnit.SECONDS);
+                    Future<PipeLine> result = cs.poll(1, TimeUnit.SECONDS);
                     if (result == null) {
                         break;
                     }
 
-                    PipeLine complete = null;
+                    PipeLine complete;
                     try {
                         complete = result.get();
                     } catch (ExecutionException e) {
