@@ -9,7 +9,10 @@ import cn.hashdata.bireme.pipeline.PipeLine;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedList;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * An in-memory cache for {@link Row}. We use cache to merge and load change data in batch.
@@ -108,9 +111,8 @@ public class RowCache {
         RowBatchMerger merger = localMerger.remove();
         merger.setBatch(batch, callbacks);
 
-        // 类似的: 下面的过程在 transformer 过程中被封装成了 startTransform(trans);
-        ExecutorService mergerPool = cxt.mergerPool;
-        Future<LoadTask> task = mergerPool.submit(merger);
+        // 类似的的操作还有 Transformer 任务的提交
+        Future<LoadTask> task = cxt.mergerPool.submit(merger);
         mergeResult.add(task);
 
         localMerger.add(merger);
@@ -127,10 +129,9 @@ public class RowCache {
      */
     public void startLoad() throws BiremeException, InterruptedException {
         Future<LoadTask> head = mergeResult.peek();
-
+        // head.isDone 仅是对Loader线程是否启动的一个判断条件
+        // 具体对mergeResult的处理是在ChangeLoader线程里面执行的
         if (head != null && head.isDone()) {
-            // TODO:loadResult咋一上來就有值了呢？
-            // TODO:loadResult就一個，是說一個pipeline就用一個loader就行了？
             // get result of last load
             if (loadResult != null && loadResult.isDone()) {
                 try {

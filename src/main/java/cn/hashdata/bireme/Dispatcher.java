@@ -44,17 +44,16 @@ public class Dispatcher {
 
         while (!transResult.isEmpty() && !cxt.stop) {
             Future<RowSet> head = transResult.peek();
-            
             if (!head.isDone()) {
                 break;
             }
-            // Done
             transResult.remove();
             try {
                 rowSet = head.get();
             } catch (ExecutionException e) {
                 throw new BiremeException("Transform failed.", e.getCause());
             }
+
             if (!insertRowSet()) {
                 break;
             }

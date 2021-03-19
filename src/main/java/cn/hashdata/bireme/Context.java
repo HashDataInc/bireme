@@ -95,8 +95,6 @@ public class Context {
      */
     public void startScheduler() {
         scheduleResult = schedule.submit(new Scheduler(this));
-
-        // TODO:用于状态监控的服务应该拆分出去
         server.start();
     }
 

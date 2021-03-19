@@ -24,6 +24,7 @@ public class Scheduler implements Callable<Long> {
 
     public Scheduler(Context cxt) {
         this.cxt = cxt;
+        // TODO:ExecutorCompletionService和ExecutorService有何區別？
         this.cs = new ExecutorCompletionService<PipeLine>(cxt.pipeLinePool);
         this.pipeLineQueue = new LinkedList<PipeLine>();
 
@@ -44,6 +45,7 @@ public class Scheduler implements Callable<Long> {
                 PipeLine pipeLine = pipeLineQueue.removeFirst();
                 switch (pipeLine.state) {
                     case NORMAL:
+                        // TODO:如果pipeline数超过了池子的大小也能被submit吗？
                         cs.submit(pipeLine);
                         workingPipeLine++;
                         break;
@@ -55,9 +57,9 @@ public class Scheduler implements Callable<Long> {
             // get result of all completed pipeline
             if (workingPipeLine != 0) {
                 while (!cxt.stop) {
-                    // 只有一张表的同步出现中断 result 值才为非空，正常运行情况下都是 null
-                    // 为了避免 Schedule 单线程进入死循环的状态，所以需要增加一定的等待时间
-                    Future<PipeLine> result = cs.poll(1, TimeUnit.SECONDS);
+                    // 只要PipeLine处理线程将一批数据处理完成之后，就会退出
+                    // 为了避免空闲状态下 Schedule 单线程频繁的轮询，导致CPU 100%，所以需要增加一定的等待时间
+                    Future<PipeLine> result = cs.poll(20, TimeUnit.MILLISECONDS);
                     if (result == null) {
                         break;
                     }

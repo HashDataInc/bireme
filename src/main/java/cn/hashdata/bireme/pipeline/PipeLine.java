@@ -7,7 +7,10 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * {@code PipeLine} is a bridge between data source and target table. The data flow order is
@@ -115,7 +118,11 @@ public abstract class PipeLine implements Callable<PipeLine> {
 
             Transformer trans = localTransformer.remove();
             trans.setChangeSet(changeSet);
-            startTransform(trans);
+
+            // 用共享的池子去做Transformer任务，不会为localTransformer单独分配一个池子
+            Future<RowSet> result = cxt.transformerPool.submit(trans);
+            transResult.add(result);
+
             // TODO:在此直接釋放回池子是否合適
             localTransformer.add(trans);
         }
@@ -193,12 +200,6 @@ public abstract class PipeLine implements Callable<PipeLine> {
      * @return a new {@code Transformer}
      */
     public abstract Transformer createTransformer();
-
-    private void startTransform(Transformer trans) {
-        ExecutorService transformerPool = cxt.transformerPool;
-        Future<RowSet> result = transformerPool.submit(trans);
-        transResult.add(result);
-    }
 
     /**
      * Get the unique name for the {@code PipeLine}.

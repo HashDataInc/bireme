@@ -88,19 +88,19 @@ public class ChangeLoader implements Callable<Long> {
      */
     @Override
     public Long call() throws BiremeException, InterruptedException {
-        // TODO:数据加载成功之后，为什么不退出循环呢？
-        // 如果有很多数据堆积的话，则该线程继续工作
+        // 如果有很多数据堆积的话，则该线程继续工作，一次性把所有待做的工作全做完
+        // 在不能执行导入的时候，则Loader线程主动退出，退位让贤。。。
+        // 等待下一次该线程被调度的之后，继续往下执行
         while (!cxt.stop) {
-            // get task
             if (currentTask == null) {
                 currentTask = pollTask();
             }
 
+            // 如果currentTask为空，那下一轮线程调度的时候再执行
             if (currentTask == null) {
                 break;
             }
 
-            // get connection
             conn = getConnection();
             if (conn == null) {
                 logger.error("Unable to get Connection.");
