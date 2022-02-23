@@ -14,28 +14,27 @@ import java.util.HashSet;
  * committed.
  *
  * @author yuze
- *
  */
 public class LoadTask {
-  public ArrayList<CommitCallback> callbacks;
-  public HashSet<String> delete;
-  public HashMap<String, String> insert;
+    public ArrayList<CommitCallback> callbacks;
+    public HashSet<String> delete;
+    public HashMap<String, String> insert;
 
-  /**
-   * Create a new {@code LoadTask}.
-   */
-  public LoadTask() {
-    this.callbacks = new ArrayList<CommitCallback>();
-    this.delete = new HashSet<String>();
-    this.insert = new HashMap<String, String>();
-  }
+    /**
+     * Create a new {@code LoadTask}.
+     */
+    public LoadTask() {
+        this.callbacks = new ArrayList<CommitCallback>();
+        this.delete = new HashSet<String>();
+        this.insert = new HashMap<String, String>();
+    }
 
-  /**
-   * Destroy the {@code LoadTask}.
-   */
-  public void destory() {
-    callbacks.clear();
-    delete.clear();
-    insert.clear();
-  }
+    /**
+     * Destroy the {@code LoadTask}.
+     */
+    public void destory() {
+        callbacks.clear();
+        delete.clear();
+        insert.clear();
+    }
 }

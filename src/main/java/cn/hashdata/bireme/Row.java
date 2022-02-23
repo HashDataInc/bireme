@@ -10,16 +10,15 @@ package cn.hashdata.bireme;
  * tables, the operation type, operation result, and position in the data source.
  *
  * @author yuze
- *
  */
 public class Row {
-  public enum RowType { INSERT, UPDATE, DELETE }
+    public Long produceTime;
+    public RowType type;
+    public String originTable;
+    public String mappedTable;
+    public String keys;
+    public String oldKeys;
+    public String tuple;
 
-  public Long produceTime;
-  public RowType type;
-  public String originTable;
-  public String mappedTable;
-  public String keys;
-  public String oldKeys;
-  public String tuple;
+    public enum RowType {INSERT, UPDATE, DELETE}
 }
