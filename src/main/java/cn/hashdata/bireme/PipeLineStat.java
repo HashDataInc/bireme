@@ -1,128 +1,123 @@
 package cn.hashdata.bireme;
 
-import java.util.Date;
-import java.util.HashMap;
-
+import cn.hashdata.bireme.pipeline.PipeLine;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 
-import cn.hashdata.bireme.pipeline.PipeLine;
+import java.util.Date;
+import java.util.HashMap;
 
 /**
  * {@code PipeLineStat} contains the statistics about the {@code PipeLine}.
  *
  * @author yuze
- *
  */
 public class PipeLineStat {
-  private static final Long SCECOND_TO_MILLISECOND = 1000L;
-  private String pipeLineName;
-  public Long newestCompleted = 0L;
-  public Long delay = 0L;
+    private static final Long SCECOND_TO_MILLISECOND = 1000L;
+    private final String pipeLineName;
+    private final PipeLine pipeLine;
+    private final MetricRegistry register;
+    public Long newestCompleted = 0L;
+    public Long delay = 0L;
+    public Timer avgDelay;
+    public Meter recordCount;
+    public Gauge<String> pipeLineState;
+    public Gauge<String> completed;
+    public Gauge<String> syncGap;
+    public Gauge<Long> transformQueueSize;
+    public HashMap<String, Gauge<Long>> cacheSize;
+    public HashMap<String, Timer> copyForDelete;
+    public HashMap<String, Timer> delete;
+    public HashMap<String, Timer> insert;
 
-  private PipeLine pipeLine;
-  private MetricRegistry register;
+    public PipeLineStat(PipeLine pipeLine) {
+        this.pipeLine = pipeLine;
+        this.pipeLineName = pipeLine.myName;
+        this.register = pipeLine.cxt.register;
 
-  public Timer avgDelay;
-  public Meter recordCount;
-  public Gauge<String> pipeLineState;
-  public Gauge<String> completed;
-  public Gauge<String> syncGap;
-  public Gauge<Long> transformQueueSize;
+        cacheSize = new HashMap<String, Gauge<Long>>();
+        copyForDelete = new HashMap<String, Timer>();
+        delete = new HashMap<String, Timer>();
+        insert = new HashMap<String, Timer>();
 
-  public HashMap<String, Gauge<Long>> cacheSize;
-  public HashMap<String, Timer> copyForDelete;
-  public HashMap<String, Timer> delete;
-  public HashMap<String, Timer> insert;
+        avgDelay = register.timer(MetricRegistry.name(pipeLineName, "AvgDelay"));
+        recordCount = register.meter(MetricRegistry.name(pipeLineName, "RecordCount"));
 
-  public PipeLineStat(PipeLine pipeLine) {
-    this.pipeLine = pipeLine;
-    this.pipeLineName = pipeLine.myName;
-    this.register = pipeLine.cxt.register;
+        pipeLineState = new Gauge<String>() {
+            @Override
+            public String getValue() {
+                return pipeLine.state.toString();
+            }
+        };
 
-    cacheSize = new HashMap<String, Gauge<Long>>();
-    copyForDelete = new HashMap<String, Timer>();
-    delete = new HashMap<String, Timer>();
-    insert = new HashMap<String, Timer>();
+        completed = new Gauge<String>() {
+            @Override
+            public String getValue() {
+                return new Date(newestCompleted * SCECOND_TO_MILLISECOND).toString();
+            }
+        };
 
-    avgDelay = register.timer(MetricRegistry.name(pipeLineName, "AvgDelay"));
-    recordCount = register.meter(MetricRegistry.name(pipeLineName, "RecordCount"));
+        syncGap = new Gauge<String>() {
+            @Override
+            public String getValue() {
+                Long now = new Date().getTime() / SCECOND_TO_MILLISECOND;
+                return (now - newestCompleted) + "seconds.";
+            }
+        };
 
-    pipeLineState = new Gauge<String>() {
-      @Override
-      public String getValue() {
-        return pipeLine.state.toString();
-      }
-    };
+        transformQueueSize = new Gauge<Long>() {
+            @Override
+            public Long getValue() {
+                return (long) pipeLine.transResult.size();
+            }
+        };
 
-    completed = new Gauge<String>() {
-      @Override
-      public String getValue() {
-        return new Date(newestCompleted * SCECOND_TO_MILLISECOND).toString();
-      }
-    };
+        register.register(MetricRegistry.name(pipeLineName, "PipeLine State"), pipeLineState);
+        register.register(MetricRegistry.name(pipeLineName, "Completed"), completed);
+        register.register(MetricRegistry.name(pipeLineName, "SyncGap"), syncGap);
+        register.register(MetricRegistry.name(pipeLineName, "TransformQueueSize"), transformQueueSize);
+    }
 
-    syncGap = new Gauge<String>() {
-      @Override
-      public String getValue() {
-        Long now = new Date().getTime() / SCECOND_TO_MILLISECOND;
-        return String.valueOf(now - newestCompleted) + "seconds.";
-      }
-    };
+    /**
+     * Add {@code Gauge} for a {@link RowCache} to get the size.
+     *
+     * @param table the name of the cache
+     * @param cache the {@code RowCache} itselff
+     */
+    public void addGaugeForCache(String table, RowCache cache) {
+        Gauge<Long> gauge = new Gauge<Long>() {
+            @Override
+            public Long getValue() {
+                return (long) cache.rows.size();
+            }
+        };
 
-    transformQueueSize = new Gauge<Long>() {
-      @Override
-      public Long getValue() {
-        return (long) pipeLine.transResult.size();
-      }
-    };
+        cacheSize.put(table, gauge);
+        register.register(MetricRegistry.name(pipeLineName, table, "Cache"), gauge);
+    }
 
-    register.register(MetricRegistry.name(pipeLineName, "PipeLine State"), pipeLineState);
-    register.register(MetricRegistry.name(pipeLineName, "Completed"), completed);
-    register.register(MetricRegistry.name(pipeLineName, "SyncGap"), syncGap);
-    register.register(MetricRegistry.name(pipeLineName, "TransformQueueSize"), transformQueueSize);
-  }
+    /**
+     * Add {@code Timer}s for a {@link ChangeLoader}. Each {@code ChangeLoader} has three Timer.
+     * <ul>
+     * <li>Record the time of copy followed by delete</li>
+     * <li>Record the time of delete</li>
+     * <li>Record the time of insert in copy way</li>
+     * </ul>
+     *
+     * @param table the {@code ChangeLoader}'s table
+     * @return the registered Timer
+     */
+    public Timer[] addTimerForLoader(String table) {
+        Timer[] timers = new Timer[3];
+        timers[0] = register.timer(MetricRegistry.name(pipeLineName, table, "Loader", "CopyForDelete"));
+        timers[1] = register.timer(MetricRegistry.name(pipeLineName, table, "Loader", "Delete"));
+        timers[2] = register.timer(MetricRegistry.name(pipeLineName, table, "Loader", "Insert"));
 
-  /**
-   * Add {@code Gauge} for a {@link RowCache} to get the size.
-   *
-   * @param table the name of the cache
-   * @param cache the {@code RowCache} itselff
-   */
-  public void addGaugeForCache(String table, RowCache cache) {
-    Gauge<Long> gauge = new Gauge<Long>() {
-      @Override
-      public Long getValue() {
-        return (long) cache.rows.size();
-      }
-    };
-
-    cacheSize.put(table, gauge);
-    register.register(MetricRegistry.name(pipeLineName, table, "Cache"), gauge);
-  }
-
-  /**
-   * Add {@code Timer}s for a {@link ChangeLoader}. Each {@code ChangeLoader} has three Timer.
-   * <ul>
-   * <li>Record the time of copy followed by delete</li>
-   * <li>Record the time of delete</li>
-   * <li>Record the time of insert in copy way</li>
-   * </ul>
-   *
-   * @param table the {@code ChangeLoader}'s table
-   * @return the registered Timer
-   */
-  public Timer[] addTimerForLoader(String table) {
-    Timer[] timers = new Timer[3];
-    timers[0] = register.timer(MetricRegistry.name(pipeLineName, table, "Loader", "CopyForDelete"));
-    timers[1] = register.timer(MetricRegistry.name(pipeLineName, table, "Loader", "Delete"));
-    timers[2] = register.timer(MetricRegistry.name(pipeLineName, table, "Loader", "Insert"));
-
-    copyForDelete.put(table, timers[0]);
-    delete.put(table, timers[1]);
-    insert.put(table, timers[2]);
-    return timers;
-  }
+        copyForDelete.put(table, timers[0]);
+        delete.put(table, timers[1]);
+        insert.put(table, timers[2]);
+        return timers;
+    }
 }

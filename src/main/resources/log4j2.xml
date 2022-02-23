@@ -2,14 +2,14 @@
 <Configuration status="WARN">
   <Appenders>
     <Console name="Console" target="SYSTEM_ERR">
-      <PatternLayout pattern="%d{HH:mm:ss,SSS} %-5level %logger{1} - %msg%n"/>
+      <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{-1} - %msg%n"/>
     </Console>
     <Console name="BiremeConsole" target="SYSTEM_OUT">
-      <PatternLayout pattern="%d{HH:mm:ss} %-5level %logger{-1} - %msg%n"/>"
+      <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{-1} - %msg%n"/>"
     </Console>
   </Appenders>
   <Loggers>
-    <Root level="error">
+    <Root level="info">
       <AppenderRef ref="Console"/>
     </Root>
     <Logger name="Bireme" level="info" additivity="false">  
